@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Drag Website Builder
 
-## Getting Started
+A visual drag-and-drop website builder, built with Next.js, TypeScript, and PostgreSQL.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Visual Editor**: Drag-and-drop components with absolute positioning
+- **Component Library**: Text, Image, Button, and Container components
+- **Property Panel**: Edit component properties and styles
+- **Auto-save**: Drafts are automatically saved with debouncing
+- **Publish**: Create immutable published versions of pages
+- **Public Access**: Published pages accessible via `/p/[pageId]`
+- **User Authentication**: Google OAuth login via NextAuth
+- **Data Isolation**: Users can only access/modify their own pages
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: NextAuth.js with Google Provider
+- **Drag & Drop**: @dnd-kit
+- **State Management**: Zustand
+- **Styling**: Tailwind CSS
+
+## Setup
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Set up environment variables**:
+   Copy `.env.example` to `.env` and fill in:
+   - `DATABASE_URL`: PostgreSQL connection string
+   - `NEXTAUTH_URL`: Your app URL (e.g., `http://localhost:3000`)
+   - `NEXTAUTH_SECRET`: A random secret string
+   - `GOOGLE_CLIENT_ID`: Google OAuth client ID
+   - `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+
+3. **Set up database**:
+   ```bash
+   npx prisma migrate dev
+   npx prisma generate
+   ```
+
+4. **Run development server**:
+   ```bash
+   npm run dev
+   ```
+
+## Project Structure
+
+```
+├── app/
+│   ├── api/
+│   │   ├── auth/[...nextauth]/    # NextAuth routes
+│   │   ├── pages/                  # Page CRUD API
+│   │   └── public/                 # Public page API
+│   ├── dashboard/                 # User dashboard
+│   ├── editor/[pageId]/            # Editor page
+│   └── p/[pageId]/                 # Public page view
+├── components/
+│   ├── components/                 # Component library
+│   ├── editor/                     # Editor components
+│   └── runtime/                    # Runtime renderer
+├── lib/
+│   ├── auth.ts                     # NextAuth config
+│   ├── prisma.ts                   # Prisma client
+│   └── utils.ts                     # Utilities
+├── prisma/
+│   └── schema.prisma               # Database schema
+├── store/
+│   └── editorStore.ts              # Zustand store
+└── types/
+    └── schema.ts                   # TypeScript types
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Usage
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Sign in**: Visit the app and sign in with Google
+2. **Create page**: Click "Create New Page" on the dashboard
+3. **Edit**: Drag components from the palette to the canvas
+4. **Configure**: Select a component to edit its properties
+5. **Publish**: Click "Publish" to make the page publicly accessible
+6. **Share**: Share the `/p/[pageId]` link
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Database Schema
 
-## Learn More
+- **users**: User accounts (managed by NextAuth)
+- **pages**: Page metadata and draft schemas
+- **page_versions**: Immutable published versions
 
-To learn more about Next.js, take a look at the following resources:
+## Security
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- All API routes verify user authentication
+- User data isolation enforced at database level
+- Runtime renderer uses whitelist for components and styles
+- URLs are sanitized to prevent XSS attacks
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Development Roadmap
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [ ] Undo/redo functionality
+- [ ] Component resizing
+- [ ] Image upload support
+- [ ] More component types
+- [ ] Custom domains
+- [ ] Collaboration features
