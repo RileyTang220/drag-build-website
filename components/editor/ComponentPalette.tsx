@@ -1,67 +1,51 @@
-// Component palette - drag components from here to canvas
+// Component palette - Wix-style add elements sidebar
 'use client'
 
 import { useDraggable } from '@dnd-kit/core'
 import { ComponentType } from '@/types/schema'
 
-const components: { type: ComponentType; label: string; icon: string }[] = [
+const COMPONENTS: { type: ComponentType; label: string; icon: string }[] = [
   { type: 'Text', label: 'Text', icon: 'T' },
-  { type: 'Image', label: 'Image', icon: '🖼️' },
-  { type: 'Button', label: 'Button', icon: '🔘' },
-  { type: 'Container', label: 'Container', icon: '📦' },
+  { type: 'Image', label: 'Image', icon: '🖼' },
+  { type: 'Button', label: 'Button', icon: '▶' },
+  { type: 'Container', label: 'Box', icon: '▢' },
 ]
 
-function DraggableComponent({
-  type,
-  label,
-  icon,
-}: {
-  type: ComponentType
-  label: string
-  icon: string
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: `palette-${type}`,
-      data: {
-        type: 'palette-item',
-        componentType: type,
-      },
-    })
-
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
-    : undefined
+function DraggableItem({ type, label, icon }: { type: ComponentType; label: string; icon: string }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `palette-${type}`,
+    data: { type: 'palette-item', componentType: type },
+  })
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
       {...listeners}
       {...attributes}
       className={`
-        p-4 bg-white border-2 border-dashed border-gray-300 rounded-lg
-        cursor-grab active:cursor-grabbing
-        hover:border-blue-500 hover:bg-blue-50
-        transition-colors
+        flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-grab active:cursor-grabbing
+        text-[#cccccc] hover:bg-[#2d2d2d] hover:text-white transition-colors
         ${isDragging ? 'opacity-50' : ''}
       `}
     >
-      <div className="text-2xl mb-2">{icon}</div>
-      <div className="text-sm font-medium">{label}</div>
+      <span className="w-8 h-8 flex items-center justify-center bg-[#3c3c3c] rounded text-sm font-medium">
+        {icon}
+      </span>
+      <span className="text-sm">{label}</span>
     </div>
   )
 }
 
 export function ComponentPalette() {
   return (
-    <div className="w-64 bg-white border-r p-4 overflow-y-auto">
-      <h2 className="text-lg font-semibold mb-4">Components</h2>
-      <div className="space-y-3">
-        {components.map((comp) => (
-          <DraggableComponent key={comp.type} {...comp} />
+    <div className="w-56 flex-shrink-0 bg-[#252526] border-r border-[#3c3c3c] flex flex-col">
+      <div className="px-3 py-3 border-b border-[#3c3c3c]">
+        <h2 className="text-xs font-medium text-[#8c8c8c] uppercase tracking-wide">Add Elements</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {COMPONENTS.map((c) => (
+          <DraggableItem key={c.type} type={c.type} label={c.label} icon={c.icon} />
         ))}
       </div>
     </div>

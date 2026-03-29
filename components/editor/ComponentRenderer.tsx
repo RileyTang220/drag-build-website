@@ -38,15 +38,15 @@ export function ComponentRenderer({
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined,
-    border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+    borderWidth: isSelected ? 2 : (node.style.borderWidth ?? 0),
+    borderStyle: 'solid',
+    borderColor: isSelected ? '#2b579a' : (node.style.borderColor || 'transparent'),
     cursor: 'move',
     opacity: isDragging ? 0.5 : 1,
     // Merge additional styles from node.style, but don't override position
     fontSize: node.style.fontSize ? `${node.style.fontSize}px` : undefined,
     color: node.style.color,
     backgroundColor: node.style.backgroundColor,
-    borderColor: node.style.borderColor,
-    borderWidth: node.style.borderWidth ? `${node.style.borderWidth}px` : undefined,
     borderRadius: node.style.borderRadius ? `${node.style.borderRadius}px` : undefined,
     padding: node.style.padding ? `${node.style.padding}px` : undefined,
     margin: node.style.margin ? `${node.style.margin}px` : undefined,
@@ -57,11 +57,26 @@ export function ComponentRenderer({
   const renderComponent = () => {
     switch (node.type) {
       case 'Text':
-        return <TextComponent {...node.props} />
+        return (
+          <TextComponent
+            {...node.props}
+            color={node.style.color}
+            fontSize={node.style.fontSize}
+            fontWeight={node.style.fontWeight}
+            textAlign={node.style.textAlign}
+          />
+        )
       case 'Image':
         return <ImageComponent {...node.props} />
       case 'Button':
-        return <ButtonComponent {...node.props} />
+        return (
+          <ButtonComponent
+            {...node.props}
+            backgroundColor={node.style.backgroundColor}
+            color={node.style.color}
+            borderRadius={node.style.borderRadius}
+          />
+        )
       case 'Container':
         return <ContainerComponent node={node} />
       default:
@@ -79,7 +94,7 @@ export function ComponentRenderer({
         e.stopPropagation()
         onSelect()
       }}
-      className={isSelected ? 'ring-2 ring-blue-500' : ''}
+      className={isSelected ? 'ring-2 ring-[#2b579a] ring-offset-1' : ''}
     >
       {renderComponent()}
     </div>

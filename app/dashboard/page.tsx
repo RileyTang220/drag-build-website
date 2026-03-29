@@ -1,10 +1,11 @@
-// Dashboard page - List and manage user's pages
+// Dashboard - Wix-style page list and creation
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getDefaultCanvasSize } from '@/lib/editorLayout'
 
 interface Page {
   id: string
@@ -48,13 +49,17 @@ export default function DashboardPage() {
   const createPage = async () => {
     setCreating(true)
     try {
+      const { width, height } = getDefaultCanvasSize(
+        window.innerWidth,
+        window.innerHeight
+      )
       const res = await fetch('/api/pages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: 'Untitled Page',
+          canvasWidth: width,
+          canvasHeight: height,
         }),
       })
       const data = await res.json()
@@ -69,14 +74,9 @@ export default function DashboardPage() {
   }
 
   const deletePage = async (pageId: string) => {
-    if (!confirm('Are you sure you want to delete this page?')) {
-      return
-    }
-
+    if (!confirm('Are you sure you want to delete this page?')) return
     try {
-      await fetch(`/api/pages/${pageId}`, {
-        method: 'DELETE',
-      })
+      await fetch(`/api/pages/${pageId}`, { method: 'DELETE' })
       fetchPages()
     } catch (error) {
       console.error('Error deleting page:', error)
@@ -85,49 +85,76 @@ export default function DashboardPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
+        <div className="w-8 h-8 border-2 border-[#2b579a] border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
-  if (!session) {
-    return null
-  }
+  if (!session) return null
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">My Pages</h1>
+    <div className="min-h-screen bg-[#f8f9fa]">
+      {/* Header */}
+      <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-semibold text-[#162d3d]">My Sites</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{session.user?.email}</span>
           <button
             onClick={createPage}
             disabled={creating}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="h-9 px-5 bg-[#2b579a] text-white text-sm font-medium rounded hover:bg-[#234a7f] disabled:opacity-60 transition-colors"
           >
-            {creating ? 'Creating...' : 'Create New Page'}
+            {creating ? 'Creating...' : '+ Create New Site'}
           </button>
         </div>
+      </header>
 
+      {/* Content */}
+      <main className="max-w-5xl mx-auto px-6 py-10">
         {pages.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">No pages yet. Create your first page!</p>
+          <div className="text-center py-20">
+            <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-[#e8f0fe] flex items-center justify-center">
+              <svg className="w-12 h-12 text-[#2b579a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Create your first site</h2>
+            <p className="text-gray-500 mb-6 max-w-md mx-auto">
+              Drag and drop to build your site. Add text, images, buttons and more.
+            </p>
+            <button
+              onClick={createPage}
+              disabled={creating}
+              className="h-11 px-8 bg-[#2b579a] text-white font-medium rounded-lg hover:bg-[#234a7f] disabled:opacity-60 transition-colors"
+            >
+              Get Started
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {pages.map((page) => (
               <div
                 key={page.id}
-                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
               >
-                <h2 className="text-xl font-semibold mb-2">{page.title}</h2>
-                <div className="text-sm text-gray-500 mb-4">
-                  Updated: {new Date(page.updatedAt).toLocaleDateString()}
-                </div>
-                <div className="flex gap-2">
+                <Link href={`/editor/${page.id}`} className="block">
+                  <div className="aspect-[4/3] bg-gray-100 flex items-center justify-center">
+                    <div className="text-4xl text-gray-300">📄</div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-900 truncate">{page.title}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Updated {new Date(page.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </Link>
+                <div className="px-4 pb-4 flex gap-2">
                   <Link
                     href={`/editor/${page.id}`}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded text-center hover:bg-blue-700"
+                    className="flex-1 py-2 text-center text-sm font-medium text-[#2b579a] hover:bg-[#e8f0fe] rounded-lg transition-colors"
                   >
                     Edit
                   </Link>
@@ -135,14 +162,14 @@ export default function DashboardPage() {
                     <Link
                       href={`/p/${page.id}`}
                       target="_blank"
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                      className="py-2 px-4 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                     >
                       View
                     </Link>
                   )}
                   <button
-                    onClick={() => deletePage(page.id)}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                    onClick={(e) => { e.preventDefault(); deletePage(page.id) }}
+                    className="py-2 px-4 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     Delete
                   </button>
@@ -151,7 +178,7 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

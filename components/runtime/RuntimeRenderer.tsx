@@ -83,18 +83,18 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
 
   // For nested components (inside containers), don't wrap in another div
   const Wrapper = isNested ? React.Fragment : 'div'
-  const wrapperProps = isNested ? {} : { key: node.id, style }
+  const wrapperProps = isNested ? {} : { style }
 
   switch (node.type) {
     case 'Text':
       return (
-        <Wrapper {...wrapperProps}>
+        <Wrapper key={node.id} {...wrapperProps}>
           <TextComponent {...node.props} />
         </Wrapper>
       )
     case 'Image':
       return (
-        <Wrapper {...wrapperProps}>
+        <Wrapper key={node.id} {...wrapperProps}>
           <ImageComponent {...node.props} />
         </Wrapper>
       )
@@ -105,13 +105,13 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
         href: sanitizeUrl(node.props.href),
       }
       return (
-        <Wrapper {...wrapperProps}>
+        <Wrapper key={node.id} {...wrapperProps}>
           <ButtonComponent {...buttonProps} />
         </Wrapper>
       )
     case 'Container':
       return (
-        <Wrapper {...wrapperProps}>
+        <Wrapper key={node.id} {...wrapperProps}>
           <div
             style={{
               width: '100%',

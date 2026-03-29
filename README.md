@@ -15,7 +15,7 @@ A visual drag-and-drop website builder, built with Next.js, TypeScript, and Post
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (App Router)
+- **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: NextAuth.js with Google Provider
