@@ -1,18 +1,12 @@
-import "dotenv/config";
-import { defineConfig } from "prisma/config";
+import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 
-// prisma generate 不会连库，但 Prisma 7 仍会解析该字段；Vercel/Docker 构建阶段若未注入
-// DATABASE_URL 会报错，故用占位串；运行时请务必配置真实 DATABASE_URL。
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:5432/postgres";
+const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
-  datasource: {
-    url: databaseUrl,
-  },
-});
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+  })
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
