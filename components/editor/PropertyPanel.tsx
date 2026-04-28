@@ -21,6 +21,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+const inputCls =
+  'w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]'
+
 export function PropertyPanel() {
   const { schema, selectedId, updateNode, deleteNode } = useEditorStore()
 
@@ -61,7 +64,7 @@ export function PropertyPanel() {
                 type="number"
                 value={node.style.left}
                 onChange={(e) => handleStyleChange('left', parseInt(e.target.value) || 0)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Y">
@@ -69,7 +72,7 @@ export function PropertyPanel() {
                 type="number"
                 value={node.style.top}
                 onChange={(e) => handleStyleChange('top', parseInt(e.target.value) || 0)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Width">
@@ -78,7 +81,7 @@ export function PropertyPanel() {
                 value={node.style.width ?? ''}
                 onChange={(e) => handleStyleChange('width', e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="auto"
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Height">
@@ -87,7 +90,7 @@ export function PropertyPanel() {
                 value={node.style.height ?? ''}
                 onChange={(e) => handleStyleChange('height', e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="auto"
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
           </div>
@@ -100,7 +103,7 @@ export function PropertyPanel() {
                 value={(node.props.content as string) || ''}
                 onChange={(e) => handlePropChange('content', e.target.value)}
                 rows={2}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Font Size">
@@ -108,7 +111,7 @@ export function PropertyPanel() {
                 type="number"
                 value={node.style.fontSize ?? 16}
                 onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value) || 16)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Color">
@@ -122,6 +125,80 @@ export function PropertyPanel() {
           </Section>
         )}
 
+        {node.type === 'Heading' && (
+          <Section title="Heading">
+            <Field label="Content">
+              <input
+                type="text"
+                value={(node.props.content as string) || ''}
+                onChange={(e) => handlePropChange('content', e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Level">
+              <select
+                value={(node.props.level as number) ?? 2}
+                onChange={(e) => handlePropChange('level', parseInt(e.target.value))}
+                className={inputCls}
+              >
+                {[1, 2, 3, 4, 5, 6].map((l) => (
+                  <option key={l} value={l}>
+                    H{l}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Font Size">
+                <input
+                  type="number"
+                  value={node.style.fontSize ?? 32}
+                  onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value) || 32)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Weight">
+                <select
+                  value={String(node.style.fontWeight ?? 700)}
+                  onChange={(e) => handleStyleChange('fontWeight', parseInt(e.target.value))}
+                  className={inputCls}
+                >
+                  {[400, 500, 600, 700, 800].map((w) => (
+                    <option key={w} value={w}>
+                      {w}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field label="Color">
+              <input
+                type="color"
+                value={node.style.color || '#111827'}
+                onChange={(e) => handleStyleChange('color', e.target.value)}
+                className="w-full h-8 border border-gray-200 rounded cursor-pointer"
+              />
+            </Field>
+            <Field label="Align">
+              <div className="flex gap-1">
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => handleStyleChange('textAlign', a)}
+                    className={`flex-1 py-1.5 text-xs rounded border ${
+                      node.style.textAlign === a
+                        ? 'bg-[#2b579a] text-white border-[#2b579a]'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </Section>
+        )}
+
         {node.type === 'Image' && (
           <Section title="Image">
             <Field label="URL">
@@ -130,7 +207,7 @@ export function PropertyPanel() {
                 value={(node.props.src as string) || ''}
                 onChange={(e) => handlePropChange('src', e.target.value)}
                 placeholder="https://..."
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Alt">
@@ -138,7 +215,7 @@ export function PropertyPanel() {
                 type="text"
                 value={(node.props.alt as string) || ''}
                 onChange={(e) => handlePropChange('alt', e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
           </Section>
@@ -151,7 +228,7 @@ export function PropertyPanel() {
                 type="text"
                 value={(node.props.label as string) || ''}
                 onChange={(e) => handlePropChange('label', e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <Field label="Link">
@@ -160,7 +237,7 @@ export function PropertyPanel() {
                 value={(node.props.href as string) || ''}
                 onChange={(e) => handlePropChange('href', e.target.value)}
                 placeholder="https://..."
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
               />
             </Field>
             <div className="grid grid-cols-2 gap-2">
@@ -199,7 +276,98 @@ export function PropertyPanel() {
                 type="number"
                 value={node.style.borderRadius ?? 0}
                 onChange={(e) => handleStyleChange('borderRadius', parseInt(e.target.value) || 0)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]"
+                className={inputCls}
+              />
+            </Field>
+          </Section>
+        )}
+
+        {node.type === 'Divider' && (
+          <Section title="Divider">
+            <Field label="Color">
+              <input
+                type="color"
+                value={node.style.backgroundColor || '#e5e7eb'}
+                onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
+                className="w-full h-8 border border-gray-200 rounded cursor-pointer"
+              />
+            </Field>
+            <Field label="Style">
+              <select
+                value={node.style.borderStyle ?? 'solid'}
+                onChange={(e) => handleStyleChange('borderStyle', e.target.value)}
+                className={inputCls}
+              >
+                <option value="solid">Solid (filled)</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+              </select>
+            </Field>
+            <Field label="Thickness (px)">
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={node.style.height ?? 1}
+                onChange={(e) => handleStyleChange('height', parseInt(e.target.value) || 1)}
+                className={inputCls}
+              />
+            </Field>
+          </Section>
+        )}
+
+        {node.type === 'Input' && (
+          <Section title="Input">
+            <Field label="Label">
+              <input
+                type="text"
+                value={(node.props.label as string) || ''}
+                onChange={(e) => handlePropChange('label', e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Placeholder">
+              <input
+                type="text"
+                value={(node.props.placeholder as string) || ''}
+                onChange={(e) => handlePropChange('placeholder', e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Type">
+              <select
+                value={(node.props.type as string) || 'text'}
+                onChange={(e) => handlePropChange('type', e.target.value)}
+                className={inputCls}
+              >
+                <option value="text">Text</option>
+                <option value="email">Email</option>
+                <option value="tel">Phone</option>
+                <option value="url">URL</option>
+                <option value="number">Number</option>
+                <option value="search">Search</option>
+              </select>
+            </Field>
+          </Section>
+        )}
+
+        {node.type === 'Map' && (
+          <Section title="Map">
+            <Field label="Address">
+              <textarea
+                value={(node.props.address as string) || ''}
+                onChange={(e) => handlePropChange('address', e.target.value)}
+                rows={2}
+                placeholder="e.g. 1600 Amphitheatre Parkway, Mountain View"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Border Radius">
+              <input
+                type="number"
+                value={node.style.borderRadius ?? 0}
+                onChange={(e) => handleStyleChange('borderRadius', parseInt(e.target.value) || 0)}
+                className={inputCls}
               />
             </Field>
           </Section>

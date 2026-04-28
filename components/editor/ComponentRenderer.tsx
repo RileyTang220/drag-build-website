@@ -4,9 +4,13 @@
 import { useDraggable } from '@dnd-kit/core'
 import { ComponentNode } from '@/types/schema'
 import { TextComponent } from '../components/TextComponent'
+import { HeadingComponent } from '../components/HeadingComponent'
 import { ImageComponent } from '../components/ImageComponent'
 import { ButtonComponent } from '../components/ButtonComponent'
 import { ContainerComponent } from '../components/ContainerComponent'
+import { DividerComponent } from '../components/DividerComponent'
+import { InputComponent } from '../components/InputComponent'
+import { MapComponent } from '../components/MapComponent'
 
 interface ComponentRendererProps {
   node: ComponentNode
@@ -43,10 +47,19 @@ export function ComponentRenderer({
     borderColor: isSelected ? '#2b579a' : (node.style.borderColor || 'transparent'),
     cursor: 'move',
     opacity: isDragging ? 0.5 : 1,
-    // Merge additional styles from node.style, but don't override position
     fontSize: node.style.fontSize ? `${node.style.fontSize}px` : undefined,
     color: node.style.color,
-    backgroundColor: node.style.backgroundColor,
+    // The Container, Input, Map and Divider components paint their own
+    // background (often together with border-radius / clipping). Letting the
+    // wrapper also set bg would double-render and made bg color changes look
+    // stale when only one layer updated.
+    backgroundColor:
+      node.type === 'Container' ||
+      node.type === 'Input' ||
+      node.type === 'Map' ||
+      node.type === 'Divider'
+        ? undefined
+        : node.style.backgroundColor,
     borderRadius: node.style.borderRadius ? `${node.style.borderRadius}px` : undefined,
     padding: node.style.padding ? `${node.style.padding}px` : undefined,
     margin: node.style.margin ? `${node.style.margin}px` : undefined,
@@ -59,6 +72,16 @@ export function ComponentRenderer({
       case 'Text':
         return (
           <TextComponent
+            {...node.props}
+            color={node.style.color}
+            fontSize={node.style.fontSize}
+            fontWeight={node.style.fontWeight}
+            textAlign={node.style.textAlign}
+          />
+        )
+      case 'Heading':
+        return (
+          <HeadingComponent
             {...node.props}
             color={node.style.color}
             fontSize={node.style.fontSize}
@@ -79,6 +102,34 @@ export function ComponentRenderer({
         )
       case 'Container':
         return <ContainerComponent node={node} />
+      case 'Divider':
+        return (
+          <DividerComponent
+            backgroundColor={node.style.backgroundColor}
+            borderStyle={node.style.borderStyle}
+            borderColor={node.style.borderColor}
+            borderWidth={node.style.borderWidth}
+          />
+        )
+      case 'Input':
+        return (
+          <InputComponent
+            {...node.props}
+            color={node.style.color}
+            fontSize={node.style.fontSize}
+            backgroundColor={node.style.backgroundColor}
+            borderColor={node.style.borderColor}
+            borderRadius={node.style.borderRadius}
+            editable={false} /* canvas is for layout, not data entry */
+          />
+        )
+      case 'Map':
+        return (
+          <MapComponent
+            {...node.props}
+            borderRadius={node.style.borderRadius}
+          />
+        )
       default:
         return <div>Unknown component: {node.type}</div>
     }

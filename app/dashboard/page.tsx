@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getDefaultCanvasSize } from '@/lib/editorLayout'
 
 interface Page {
   id: string
@@ -21,7 +20,6 @@ export default function DashboardPage() {
   const router = useRouter()
   const [pages, setPages] = useState<Page[]>([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -46,32 +44,7 @@ export default function DashboardPage() {
     }
   }
 
-  const createPage = async () => {
-    setCreating(true)
-    try {
-      const { width, height } = getDefaultCanvasSize(
-        window.innerWidth,
-        window.innerHeight
-      )
-      const res = await fetch('/api/pages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: 'Untitled Page',
-          canvasWidth: width,
-          canvasHeight: height,
-        }),
-      })
-      const data = await res.json()
-      if (data.page) {
-        router.push(`/editor/${data.page.id}`)
-      }
-    } catch (error) {
-      console.error('Error creating page:', error)
-    } finally {
-      setCreating(false)
-    }
-  }
+  const goToTemplates = () => router.push('/templates')
 
   const deletePage = async (pageId: string) => {
     if (!confirm('Are you sure you want to delete this page?')) return
@@ -103,11 +76,10 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{session.user?.email}</span>
           <button
-            onClick={createPage}
-            disabled={creating}
-            className="h-9 px-5 bg-[#2b579a] text-white text-sm font-medium rounded hover:bg-[#234a7f] disabled:opacity-60 transition-colors"
+            onClick={goToTemplates}
+            className="h-9 px-5 bg-[#2b579a] text-white text-sm font-medium rounded hover:bg-[#234a7f] transition-colors"
           >
-            {creating ? 'Creating...' : '+ Create New Site'}
+            + Create New Site
           </button>
         </div>
       </header>
@@ -126,9 +98,8 @@ export default function DashboardPage() {
               Drag and drop to build your site. Add text, images, buttons and more.
             </p>
             <button
-              onClick={createPage}
-              disabled={creating}
-              className="h-11 px-8 bg-[#2b579a] text-white font-medium rounded-lg hover:bg-[#234a7f] disabled:opacity-60 transition-colors"
+              onClick={goToTemplates}
+              className="h-11 px-8 bg-[#2b579a] text-white font-medium rounded-lg hover:bg-[#234a7f] transition-colors"
             >
               Get Started
             </button>

@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Allow manually re-running the production migration from the Actions UI.
+  workflow_dispatch:
 
 # Cancel in-progress runs for the same ref when new commits arrive.
 concurrency:
@@ -15,8 +17,10 @@ permissions:
   contents: read
 
 env:
-  # prisma.config.ts loads DATABASE_URL at startup; build does not need a real DB.
+  # Build-time placeholders. Prisma's `env(...)` is resolved at engine connect
+  # time, not at `prisma generate`, so any non-empty values work for build.
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/webbuilder
+  DIRECT_URL: postgresql://postgres:postgres@localhost:5432/webbuilder
   # next-auth requires a secret at build time even though it is unused for static analysis.
   NEXTAUTH_SECRET: ci-only-not-a-real-secret-32chars-min!!
   NEXTAUTH_URL: http://localhost:3000
@@ -60,3 +64,41 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
+
+  db-migrate:
+    name: DB Migrate (production)
+    runs-on: ubuntu-latest
+    # Only run for trusted events on main:
+    #  - push to main after lint/typecheck/build all green
+    #  - manual dispatch from the Actions UI
+    needs: [lint, typecheck, build]
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
+    # GitHub Environment provides:
+    #   - Required reviewers (human approval before any DDL hits production)
+    #   - Environment-scoped secrets (DIRECT_URL only exists for this job)
+    #   - Deployment history & audit log
+    environment:
+      name: production
+      url: https://drag-build-website.vercel.app
+    concurrency:
+      group: db-migrate-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Show pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate status
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy

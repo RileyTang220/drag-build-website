@@ -7,6 +7,14 @@ generator client {
 }
 
 
+// Connection URLs are owned by `prisma.config.ts` (Prisma 7 forbids `url` /
+// `directUrl` in schema.prisma — see P1012).
+//
+// Two-URL pattern for serverless deployments:
+//   - Migrations  → DIRECT_URL  (set in prisma.config.ts → datasource.url)
+//   - App runtime → DATABASE_URL (set in lib/prisma.ts → PrismaPg adapter)
+//
+// Locally (docker-compose, no pooler) the two env vars point at the same DB.
 datasource db {
   provider = "postgresql"
 }

@@ -24,7 +24,10 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # Local Postgres has no pooler, so DATABASE_URL == DIRECT_URL.
+      # In production these are two different endpoints (pooler vs direct).
       DATABASE_URL: postgresql://postgres:postgres@db:5432/webbuilder
+      DIRECT_URL: postgresql://postgres:postgres@db:5432/webbuilder
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       # 生产环境请在根目录 .env 中覆盖 NEXTAUTH_SECRET（建议 openssl rand -base64 32）
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-docker-dev-only-change-me-32chars-min!!}

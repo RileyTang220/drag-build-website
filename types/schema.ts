@@ -1,6 +1,17 @@
 // Type definitions for page schema and components
 
-export type ComponentType = 'Text' | 'Image' | 'Button' | 'Container'
+export const COMPONENT_TYPES = [
+  'Text',
+  'Heading',
+  'Image',
+  'Button',
+  'Container',
+  'Divider',
+  'Input',
+  'Map',
+] as const
+
+export type ComponentType = (typeof COMPONENT_TYPES)[number]
 
 export interface ComponentStyle {
   position: 'absolute'
@@ -15,6 +26,7 @@ export interface ComponentStyle {
   backgroundColor?: string
   borderColor?: string
   borderWidth?: number
+  borderStyle?: 'solid' | 'dashed' | 'dotted'
   borderRadius?: number
   padding?: number
   margin?: number

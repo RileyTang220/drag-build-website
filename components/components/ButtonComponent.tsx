@@ -1,4 +1,10 @@
-// Button component for rendering buttons
+// Button component for rendering buttons.
+//
+// We let unset props fall through as `undefined` rather than baking in
+// fallback colors here — when the runtime renderer forgets to pass `color`
+// through from `node.style`, hard-coded fallbacks silently overwrite the
+// user's choice on the published page (see Bug: heading/text/box color
+// not changing in preview/publish).
 interface ButtonComponentProps {
   label?: string
   href?: string
@@ -20,13 +26,14 @@ export function ButtonComponent({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: backgroundColor || '#3b82f6',
-    color: color || '#ffffff',
-    borderRadius: borderRadius ? `${borderRadius}px` : '4px',
+    backgroundColor,
+    color,
+    borderRadius: borderRadius ? `${borderRadius}px` : undefined,
     border: 'none',
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 500,
+    fontSize: 'inherit',
+    fontWeight: 'inherit',
+    textDecoration: 'none',
   }
 
   if (href && href !== '#') {

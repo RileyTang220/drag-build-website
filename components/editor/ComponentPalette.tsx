@@ -3,15 +3,16 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { ComponentType } from '@/types/schema'
+import { componentRegistry, PALETTE_ORDER } from '@/components/registry'
 
-const COMPONENTS: { type: ComponentType; label: string; icon: string }[] = [
-  { type: 'Text', label: 'Text', icon: 'T' },
-  { type: 'Image', label: 'Image', icon: '🖼' },
-  { type: 'Button', label: 'Button', icon: '▶' },
-  { type: 'Container', label: 'Box', icon: '▢' },
-]
+interface DraggableItemProps {
+  type: ComponentType
+  label: string
+  icon: string
+  description: string
+}
 
-function DraggableItem({ type, label, icon }: { type: ComponentType; label: string; icon: string }) {
+function DraggableItem({ type, label, icon, description }: DraggableItemProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-${type}`,
     data: { type: 'palette-item', componentType: type },
@@ -23,6 +24,7 @@ function DraggableItem({ type, label, icon }: { type: ComponentType; label: stri
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
       {...listeners}
       {...attributes}
+      title={description}
       className={`
         flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-grab active:cursor-grabbing
         text-[#cccccc] hover:bg-[#2d2d2d] hover:text-white transition-colors
@@ -44,9 +46,18 @@ export function ComponentPalette() {
         <h2 className="text-xs font-medium text-[#8c8c8c] uppercase tracking-wide">Add Elements</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {COMPONENTS.map((c) => (
-          <DraggableItem key={c.type} type={c.type} label={c.label} icon={c.icon} />
-        ))}
+        {PALETTE_ORDER.map((type) => {
+          const def = componentRegistry[type]
+          return (
+            <DraggableItem
+              key={type}
+              type={type}
+              label={def.label}
+              icon={def.icon}
+              description={def.description}
+            />
+          )
+        })}
       </div>
     </div>
   )

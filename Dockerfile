@@ -9,9 +9,13 @@ RUN npm ci
 
 COPY . .
 
-# prisma.config.ts 在加载时需要 DATABASE_URL；镜像构建阶段无需真实数据库
+# Build-time placeholders — `prisma generate` and `next build` don't need to
+# reach the database; the schema's `env(...)` references are resolved at
+# runtime, not at generate time. Keeping a dummy value defensively.
 ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/webbuilder
+ARG DIRECT_URL=postgresql://postgres:postgres@localhost:5432/webbuilder
 ENV DATABASE_URL=${DATABASE_URL}
+ENV DIRECT_URL=${DIRECT_URL}
 
 RUN npx prisma generate
 RUN npm run build

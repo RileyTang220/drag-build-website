@@ -6,7 +6,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PageSchema } from '@/types/schema'
 import { apiError, parseJsonBody } from '@/lib/validation/apiError'
-import { createPageInput } from '@/lib/validation/pageSchema'
+import { createPageInput, pageSchemaZ } from '@/lib/validation/pageSchema'
+import { cloneTemplateSchema, getTemplate } from '@/lib/templates'
 import logger from '@/lib/logger'
 
 // GET /api/pages - List all pages for the current user
@@ -38,7 +39,7 @@ export async function GET() {
   }
 }
 
-// POST /api/pages - Create a new page
+// POST /api/pages - Create a new page (optionally from a template)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -49,29 +50,53 @@ export async function POST(request: NextRequest) {
 
     const parsed = await parseJsonBody(request, createPageInput)
     if ('response' in parsed) return parsed.response
-    const { title, slug, canvasWidth, canvasHeight } = parsed.data
+    const { title, slug, canvasWidth, canvasHeight, templateId } = parsed.data
 
-    const w =
-      typeof canvasWidth === 'number' && Number.isFinite(canvasWidth)
-        ? Math.round(Math.min(2560, Math.max(320, canvasWidth)))
-        : 1200
-    const h =
-      typeof canvasHeight === 'number' && Number.isFinite(canvasHeight)
-        ? Math.round(Math.min(1600, Math.max(240, canvasHeight)))
-        : 800
+    let initialSchema: PageSchema
+    let resolvedTitle = title
 
-    const defaultSchema: PageSchema = {
-      canvas: { width: w, height: h, background: '#ffffff' },
-      nodes: [],
-      meta: { title: title || 'Untitled Page' },
+    if (templateId) {
+      const template = getTemplate(templateId)
+      if (!template) {
+        return apiError('NOT_FOUND', `Template not found: ${templateId}`)
+      }
+      const cloned = cloneTemplateSchema(templateId)!
+      // Re-validate the template through the same Zod we use for user input.
+      // Catches drift if the template's schema becomes invalid after a
+      // ComponentType / style enum change.
+      const validated = pageSchemaZ.safeParse(cloned)
+      if (!validated.success) {
+        logger.error('[templates] template failed validation', {
+          templateId,
+          issues: validated.error.issues,
+        })
+        return apiError('INTERNAL', 'Template is invalid')
+      }
+      initialSchema = validated.data
+      resolvedTitle = title || template.name
+    } else {
+      const w =
+        typeof canvasWidth === 'number' && Number.isFinite(canvasWidth)
+          ? Math.round(Math.min(2560, Math.max(320, canvasWidth)))
+          : 1200
+      const h =
+        typeof canvasHeight === 'number' && Number.isFinite(canvasHeight)
+          ? Math.round(Math.min(1600, Math.max(240, canvasHeight)))
+          : 800
+      resolvedTitle = title || 'Untitled Page'
+      initialSchema = {
+        canvas: { width: w, height: h, background: '#ffffff' },
+        nodes: [],
+        meta: { title: resolvedTitle },
+      }
     }
 
     const page = await prisma.page.create({
       data: {
-        title: title || 'Untitled Page',
+        title: resolvedTitle ?? 'Untitled Page',
         slug: slug || undefined,
         ownerId: session.user.id,
-        draftSchema: defaultSchema as unknown as Prisma.InputJsonValue,
+        draftSchema: initialSchema as unknown as Prisma.InputJsonValue,
       },
     })
 

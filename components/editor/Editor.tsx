@@ -23,6 +23,7 @@ import { PropertyPanel } from './PropertyPanel'
 import { useEditorStore } from '@/store/editorStore'
 import { PageSchema, ComponentNode, ComponentType } from '@/types/schema'
 import { getDefaultCanvasSize } from '@/lib/editorLayout'
+import { getDefaultProps, getDefaultStyle } from '@/components/registry'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,32 +37,6 @@ function canvasBounds(schema: PageSchema) {
   }
   const { width, height } = getDefaultCanvasSize(window.innerWidth, window.innerHeight)
   return { w: width, h: height }
-}
-
-// ─── Default configs (moved outside component to avoid re-creation) ───────────
-
-type StylePartial = Partial<ComponentNode['style']>
-
-const DEFAULT_PROPS: Record<string, Record<string, unknown>> = {
-  Text:      { content: 'Text' },
-  Image:     { src: 'https://placehold.co/300x200', alt: 'Image' },
-  Button:    { label: 'Button', href: '#' },
-  Container: {},
-}
-
-const DEFAULT_STYLES: Record<string, StylePartial> = {
-  Text:      { width: 200, height: 30,  fontSize: 16, color: '#000000' },
-  Image:     { width: 300, height: 200 },
-  Button:    { width: 120, height: 40,  backgroundColor: '#3b82f6', color: '#ffffff', borderRadius: 4 },
-  Container: { width: 300, height: 200, backgroundColor: '#f3f4f6' },
-}
-
-function getDefaultProps(type: string): Record<string, unknown> {
-  return DEFAULT_PROPS[type] ?? {}
-}
-
-function getDefaultStyle(type: string): StylePartial {
-  return DEFAULT_STYLES[type] ?? {}
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -120,7 +95,7 @@ interface EditorProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function Editor({ pageId }: EditorProps) {
-  const { data: session, status: sessionStatus } = useSession()
+  const { status: sessionStatus } = useSession()
   const router = useRouter()
 
   const [loading,  setLoading]  = useState(true)
@@ -231,7 +206,7 @@ export function Editor({ pageId }: EditorProps) {
 
       // ── Drop palette item onto canvas ──────────────────────────────────────
       if (dragType === 'palette-item') {
-        const componentType = active.data.current?.componentType as string
+        const componentType = active.data.current?.componentType as ComponentType
         const defaultStyle = getDefaultStyle(componentType)
         const nodeW = defaultStyle.width  ?? 100
         const nodeH = defaultStyle.height ?? 50
@@ -251,7 +226,7 @@ export function Editor({ pageId }: EditorProps) {
 
         const node: ComponentNode = {
           id:    `node-${Date.now()}`,
-          type:  componentType as ComponentType,
+          type:  componentType,
           props: getDefaultProps(componentType),
           style: { position: 'absolute', left, top, ...defaultStyle },
         }

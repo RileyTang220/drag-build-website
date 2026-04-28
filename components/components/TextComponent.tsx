@@ -1,4 +1,9 @@
-// Text component for rendering text content
+// Text component for rendering text content.
+//
+// Defaults are intentionally undefined — the wrapper sets `color` via inline
+// style which children inherit, and forcing `'#000000'` here would silently
+// override a user-picked color when the prop wasn't explicitly threaded
+// through (which happened in the runtime renderer).
 interface TextComponentProps {
   content?: string
   fontSize?: number
@@ -18,11 +23,12 @@ export function TextComponent({
     <div
       style={{
         fontSize: fontSize ? `${fontSize}px` : undefined,
-        color: color || '#000000',
+        color,
         fontWeight,
         textAlign,
         width: '100%',
         height: '100%',
+        whiteSpace: 'pre-wrap',
       }}
     >
       {content}

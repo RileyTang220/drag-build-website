@@ -9,6 +9,7 @@
  * to prevent abuse (huge payloads, infinite trees, oversized JSONB rows).
  */
 import { z } from 'zod'
+import { COMPONENT_TYPES, type ComponentType } from '@/types/schema'
 
 // ─── Limits ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,9 @@ export const LIMITS = {
 
 // ─── Primitives ────────────────────────────────────────────────────────────────
 
-const componentTypeSchema = z.enum(['Text', 'Image', 'Button', 'Container'])
+// Single source of truth: types/schema.ts COMPONENT_TYPES.
+// Adding a new component there automatically opens it for the API.
+const componentTypeSchema = z.enum(COMPONENT_TYPES)
 
 const colorSchema = z
   .string()
@@ -57,6 +60,7 @@ const componentStyleSchema = z
     backgroundColor: colorSchema,
     borderColor: colorSchema,
     borderWidth: z.number().finite().min(0).max(64).optional(),
+    borderStyle: z.enum(['solid', 'dashed', 'dotted']).optional(),
     borderRadius: z.number().finite().min(0).max(512).optional(),
     padding: z.number().finite().min(0).max(512).optional(),
     margin: z.number().finite().min(0).max(512).optional(),
@@ -75,7 +79,7 @@ const componentStyleSchema = z
 
 export interface ComponentNodeInput {
   id: string
-  type: 'Text' | 'Image' | 'Button' | 'Container'
+  type: ComponentType
   props: Record<string, unknown>
   style: z.infer<typeof componentStyleSchema>
   children?: ComponentNodeInput[]
@@ -179,6 +183,13 @@ export const createPageInput = z
       .optional(),
     canvasWidth: z.number().finite().optional(),
     canvasHeight: z.number().finite().optional(),
+    /** Optional template id; omitted = blank page. */
+    templateId: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9-]+$/, 'Invalid templateId')
+      .optional(),
   })
   .strict()
 
