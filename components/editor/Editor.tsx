@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useStore } from 'zustand'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -67,22 +68,30 @@ const restrictCanvasNodeToArtboard: Modifier = (args) => {
 }
 
 /**
- * Resolve the drop position relative to the canvas element, taking zoom into
- * account. Returns { x, y } in canvas-space (un-zoomed) coordinates.
+ * Convert a viewport-space pointer position into canvas-space coordinates.
+ *
+ * Why we use a raw pointer position instead of dnd-kit's `delta`:
+ * dnd-kit applies *scroll compensation* to `delta` when the drag passes
+ * through a scrollable ancestor — `delta` reflects the dragged element's
+ * displacement relative to the scrolled content, not the pointer's raw
+ * movement. With our scrollable canvas-drop-zone that meant
+ * `activatorEvent.clientY + delta.y` could be hundreds of pixels off,
+ * pushing every drop down to the bottom edge of the canvas.
+ *
+ * The artboard rect is post-scale (it carries `transform: scale(zoom)`
+ * with `transformOrigin: 'center center'`), so dividing by `zoom` once
+ * lands us in canvas-space.
  */
-function resolveDropPosition(
-  canvasEl: HTMLElement,
-  overRect: DOMRect,
-  delta: { x: number; y: number },
-  zoom: number
-): { x: number; y: number } {
-  const canvasRect = canvasEl.getBoundingClientRect()
-  // Convert client-space delta+position into canvas-space coordinates
-  const clientX = overRect.left + delta.x
-  const clientY = overRect.top  + delta.y
+function pointerToCanvasSpace(
+  artboardEl: HTMLElement,
+  pointer: { x: number; y: number } | null,
+  zoom: number,
+): { x: number; y: number } | null {
+  if (!pointer) return null
+  const rect = artboardEl.getBoundingClientRect()
   return {
-    x: (clientX - canvasRect.left)  / zoom,
-    y: (clientY - canvasRect.top)   / zoom,
+    x: (pointer.x - rect.left) / zoom,
+    y: (pointer.y - rect.top) / zoom,
   }
 }
 
@@ -103,8 +112,60 @@ export function Editor({ pageId }: EditorProps) {
   const [saveError, setSaveError] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
 
+  // Track the live pointer position. `pointermove` fires for both mouse and
+  // touch (Pointer Events API), so a single listener covers everything.
+  // Updating a ref (not state) keeps this off the React render path; the
+  // value is only read inside event handlers where freshness is fine.
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointerRef.current = { x: e.clientX, y: e.clientY }
+    }
+    document.addEventListener('pointermove', onMove, { passive: true })
+    return () => document.removeEventListener('pointermove', onMove)
+  }, [])
+
   const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom } =
     useEditorStore()
+
+  // Subscribe to zundo's temporal store. We watch only the lengths so the
+  // editor re-renders just enough to flip the toolbar buttons enabled/
+  // disabled — not on every history mutation.
+  const pastCount = useStore(useEditorStore.temporal, (s) => s.pastStates.length)
+  const futureCount = useStore(useEditorStore.temporal, (s) => s.futureStates.length)
+  const undo = useCallback(() => useEditorStore.temporal.getState().undo(), [])
+  const redo = useCallback(() => useEditorStore.temporal.getState().redo(), [])
+  const clearHistory = useCallback(
+    () => useEditorStore.temporal.getState().clear(),
+    [],
+  )
+
+  // Keyboard shortcuts: ⌘Z / Ctrl+Z to undo, ⌘⇧Z / Ctrl+Y to redo.
+  // Skip when the user is typing in an input/textarea so undo doesn't
+  // hijack normal text editing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (
+        t &&
+        (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+      ) {
+        return
+      }
+      const meta = e.metaKey || e.ctrlKey
+      if (!meta) return
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        e.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   // ── DnD sensors ─────────────────────────────────────────────────────────────
 
@@ -139,6 +200,9 @@ export function Editor({ pageId }: EditorProps) {
         const data = await res.json()
         if (!cancelled && data.page) {
           setSchema(data.page.draftSchema as PageSchema)
+          // The initial load is not a user edit. Drop any history that
+          // accumulated during boot so ⌘Z can't rewind into nothingness.
+          clearHistory()
         }
       } catch (e) {
         console.error('[Editor] load error:', e)
@@ -149,7 +213,7 @@ export function Editor({ pageId }: EditorProps) {
 
     load()
     return () => { cancelled = true }
-  }, [pageId, sessionStatus, setSchema])
+  }, [pageId, sessionStatus, setSchema, clearHistory])
 
   // ── Auto-save ────────────────────────────────────────────────────────────────
 
@@ -211,14 +275,23 @@ export function Editor({ pageId }: EditorProps) {
         const nodeW = defaultStyle.width  ?? 100
         const nodeH = defaultStyle.height ?? 50
 
-        const canvasEl = document.getElementById('canvas-drop-zone')
+        // Resolve drop coords against the *artboard* (`canvas-artboard`),
+        // not the outer scrollable drop-zone. The artboard is what carries
+        // `transform: scale(zoom)`, so its bounding rect is already in
+        // post-zoom client space — exactly what we need to invert.
+        const artboardEl = document.getElementById('canvas-artboard')
         let x = 100
         let y = 100
 
-        if (canvasEl && over.rect) {
-          const pos = resolveDropPosition(canvasEl, over.rect as DOMRect, e.delta, zoom)
-          x = pos.x
-          y = pos.y
+        if (artboardEl) {
+          const pos = pointerToCanvasSpace(artboardEl, pointerRef.current, zoom)
+          if (pos) {
+            // Center the new element on the pointer rather than placing its
+            // top-left at the pointer — feels more like the element was
+            // dropped *at* the cursor, especially for big components.
+            x = pos.x - nodeW / 2
+            y = pos.y - nodeH / 2
+          }
         }
 
         const { w: cw, h: ch } = canvasBounds(schema)
@@ -315,6 +388,13 @@ export function Editor({ pageId }: EditorProps) {
               ← Back
             </button>
             <span className="w-px h-5 bg-[#3c3c3c] mx-2" />
+            <UndoRedoControls
+              canUndo={pastCount > 0}
+              canRedo={futureCount > 0}
+              onUndo={undo}
+              onRedo={redo}
+            />
+            <span className="w-px h-5 bg-[#3c3c3c] mx-2" />
             <span className="text-sm text-[#cccccc]">Editor</span>
           </div>
 
@@ -402,6 +482,42 @@ function ZoomControls({ zoom, onZoomIn, onZoomOut }: ZoomControlsProps) {
         className="w-6 h-6 text-[#cccccc] hover:bg-[#3c3c3c] rounded text-sm"
       >
         +
+      </button>
+    </div>
+  )
+}
+
+interface UndoRedoControlsProps {
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
+}
+
+function UndoRedoControls({ canUndo, canRedo, onUndo, onRedo }: UndoRedoControlsProps) {
+  // Shortcut hint adapts to platform — Mac shows ⌘, others show Ctrl.
+  const isMac =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+  const mod = isMac ? '⌘' : 'Ctrl+'
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        onClick={onUndo}
+        disabled={!canUndo}
+        aria-label="Undo"
+        title={`Undo (${mod}Z)`}
+        className="h-8 px-2 text-[#cccccc] hover:bg-[#2d2d2d] disabled:text-[#5a5a5a] disabled:hover:bg-transparent rounded text-base leading-none"
+      >
+        ↶
+      </button>
+      <button
+        onClick={onRedo}
+        disabled={!canRedo}
+        aria-label="Redo"
+        title={`Redo (${mod}${isMac ? '⇧Z' : 'Y'})`}
+        className="h-8 px-2 text-[#cccccc] hover:bg-[#2d2d2d] disabled:text-[#5a5a5a] disabled:hover:bg-transparent rounded text-base leading-none"
+      >
+        ↷
       </button>
     </div>
   )

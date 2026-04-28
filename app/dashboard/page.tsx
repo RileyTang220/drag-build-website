@@ -122,25 +122,32 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </Link>
-                <div className="px-4 pb-4 flex gap-2">
+                <div className="px-4 pb-4 flex gap-2 flex-wrap">
                   <Link
                     href={`/editor/${page.id}`}
-                    className="flex-1 py-2 text-center text-sm font-medium text-[#2b579a] hover:bg-[#e8f0fe] rounded-lg transition-colors"
+                    className="flex-1 min-w-[60px] py-2 text-center text-sm font-medium text-[#2b579a] hover:bg-[#e8f0fe] rounded-lg transition-colors"
                   >
                     Edit
+                  </Link>
+                  <Link
+                    href={`/submissions/${page.id}`}
+                    className="py-2 px-3 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="View form submissions"
+                  >
+                    Inbox
                   </Link>
                   {page.publishedVersionId && (
                     <Link
                       href={`/p/${page.id}`}
                       target="_blank"
-                      className="py-2 px-4 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="py-2 px-3 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                     >
                       View
                     </Link>
                   )}
                   <button
                     onClick={(e) => { e.preventDefault(); deletePage(page.id) }}
-                    className="py-2 px-4 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="py-2 px-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     Delete
                   </button>

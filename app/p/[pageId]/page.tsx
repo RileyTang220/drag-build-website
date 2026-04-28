@@ -57,7 +57,7 @@ export default function PublicPage({ params }: { params: Promise<{ pageId: strin
   // white-screens the published page for end users.
   return (
     <ErrorBoundary scope="Runtime">
-      <RuntimeRenderer schema={schema} />
+      <RuntimeRenderer schema={schema} pageId={pageId} />
     </ErrorBoundary>
   )
 }

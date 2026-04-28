@@ -231,15 +231,33 @@ export function PropertyPanel() {
                 className={inputCls}
               />
             </Field>
-            <Field label="Link">
-              <input
-                type="url"
-                value={(node.props.href as string) || ''}
-                onChange={(e) => handlePropChange('href', e.target.value)}
-                placeholder="https://..."
+            <Field label="Action">
+              <select
+                value={(node.props.action as string) || 'link'}
+                onChange={(e) => handlePropChange('action', e.target.value)}
                 className={inputCls}
-              />
+              >
+                <option value="link">Open a link</option>
+                <option value="submit">Submit form</option>
+              </select>
             </Field>
+            {(node.props.action ?? 'link') === 'link' ? (
+              <Field label="Link">
+                <input
+                  type="url"
+                  value={(node.props.href as string) || ''}
+                  onChange={(e) => handlePropChange('href', e.target.value)}
+                  placeholder="https://..."
+                  className={inputCls}
+                />
+              </Field>
+            ) : (
+              <p className="text-xs text-gray-500 -mt-1 mb-3 leading-relaxed">
+                Collects every Input on this page and sends it to{' '}
+                <code className="bg-gray-100 px-1 rounded">/api/forms/{`{pageId}`}</code>.
+                View results in the Submissions tab.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <Field label="BG">
                 <input

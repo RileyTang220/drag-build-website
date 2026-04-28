@@ -59,7 +59,7 @@ export const componentRegistry: Record<ComponentType, ComponentDefinition> = {
     label: 'Button',
     description: 'Action / link button',
     icon: 'B',
-    defaultProps: { label: 'Button', href: '#' },
+    defaultProps: { label: 'Button', href: '#', action: 'link' },
     defaultStyle: {
       width: 120,
       height: 40,

@@ -93,8 +93,12 @@ export function ComponentRenderer({
         return <ImageComponent {...node.props} />
       case 'Button':
         return (
+          // Editor: force action='link' so a stray click on a "Submit"
+          // button doesn't post the (empty) canvas form. Real submit
+          // behavior is wired up only in the runtime renderer.
           <ButtonComponent
             {...node.props}
+            action="link"
             backgroundColor={node.style.backgroundColor}
             color={node.style.color}
             borderRadius={node.style.borderRadius}

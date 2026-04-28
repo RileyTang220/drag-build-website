@@ -56,7 +56,8 @@ export const ModelName = {
   User: 'User',
   VerificationToken: 'VerificationToken',
   Page: 'Page',
-  PageVersion: 'PageVersion'
+  PageVersion: 'PageVersion',
+  FormSubmission: 'FormSubmission'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -148,6 +149,18 @@ export const PageVersionScalarFieldEnum = {
 } as const
 
 export type PageVersionScalarFieldEnum = (typeof PageVersionScalarFieldEnum)[keyof typeof PageVersionScalarFieldEnum]
+
+
+export const FormSubmissionScalarFieldEnum = {
+  id: 'id',
+  pageId: 'pageId',
+  data: 'data',
+  ip: 'ip',
+  userAgent: 'userAgent',
+  submittedAt: 'submittedAt'
+} as const
+
+export type FormSubmissionScalarFieldEnum = (typeof FormSubmissionScalarFieldEnum)[keyof typeof FormSubmissionScalarFieldEnum]
 
 
 export const SortOrder = {

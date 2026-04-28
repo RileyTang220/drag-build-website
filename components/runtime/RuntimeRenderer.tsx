@@ -1,8 +1,18 @@
-// Runtime renderer - safely renders published pages
+// Runtime renderer - safely renders published pages.
+//
+// The whole page is wrapped in a single <form>: any submit-mode Button
+// triggers a POST to /api/forms/[pageId] with every Input's value collected
+// via FormData. This is intentionally simple — one logical form per page —
+// because the editor doesn't (yet) have a "Form group" container concept.
 'use client'
 
-import React from 'react'
-import { COMPONENT_TYPES, PageSchema, ComponentNode, ComponentStyle } from '@/types/schema'
+import React, { useState } from 'react'
+import {
+  COMPONENT_TYPES,
+  PageSchema,
+  ComponentNode,
+  ComponentStyle,
+} from '@/types/schema'
 import { TextComponent } from '../components/TextComponent'
 import { HeadingComponent } from '../components/HeadingComponent'
 import { ImageComponent } from '../components/ImageComponent'
@@ -13,12 +23,16 @@ import { MapComponent } from '../components/MapComponent'
 
 interface RuntimeRendererProps {
   schema: PageSchema
+  /**
+   * Page id required to POST form submissions. When omitted, submit
+   * buttons render but do nothing — useful for previewing schemas
+   * without a backing page row.
+   */
+  pageId?: string
 }
 
-// Whitelist of allowed component types — driven from the registry source of truth.
 const ALLOWED_TYPES: ReadonlySet<string> = new Set(COMPONENT_TYPES)
 
-// Whitelist of allowed style properties
 const ALLOWED_STYLE_PROPS = [
   'position',
   'left',
@@ -51,11 +65,11 @@ const PX_PROPS = new Set([
   'margin',
 ])
 
-// Sanitize style object to only include whitelisted properties
+const SELF_PAINTING_TYPES = new Set(['Container', 'Input', 'Map', 'Divider'])
+
 function sanitizeStyle(style: ComponentStyle | Record<string, unknown>): React.CSSProperties {
   const sanitized: React.CSSProperties = {}
   const styleObj = style as Record<string, unknown>
-
   for (const key of ALLOWED_STYLE_PROPS) {
     if (styleObj[key] !== undefined) {
       const value = styleObj[key]
@@ -68,12 +82,9 @@ function sanitizeStyle(style: ComponentStyle | Record<string, unknown>): React.C
       }
     }
   }
-
   return sanitized
 }
 
-// Sanitize URL to prevent XSS. Accepts unknown so callers can pass values
-// pulled out of an untyped props bag without an extra cast.
 function sanitizeUrl(url: unknown): string {
   if (typeof url !== 'string' || !url) return '#'
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:')) {
@@ -82,16 +93,19 @@ function sanitizeUrl(url: unknown): string {
   return '#'
 }
 
-// Components that paint their own background / border. The wrapper must
-// NOT also set them or the same value gets rendered twice and color changes
-// look "stuck" on the older layer (matches editor ComponentRenderer).
-const SELF_PAINTING_TYPES = new Set(['Container', 'Input', 'Map', 'Divider'])
+/**
+ * Convert an Input's label into a key that satisfies the formSubmission
+ * Zod regex (`^[a-zA-Z0-9 ._-]+$`). Replace illegal runs with `_` and
+ * cap at 64 chars. We sanitize on the client AND the server validates,
+ * so weird characters never reach the database.
+ */
+function sanitizeFieldName(name: string): string {
+  const cleaned = name.replace(/[^a-zA-Z0-9 ._-]+/g, '_').trim().slice(0, 64)
+  return cleaned || 'field'
+}
 
 function renderNode(node: ComponentNode, isNested: boolean = false): React.ReactNode {
-  // Only render whitelisted component types
-  if (!ALLOWED_TYPES.has(node.type)) {
-    return null
-  }
+  if (!ALLOWED_TYPES.has(node.type)) return null
 
   const style = sanitizeStyle(node.style)
   if (SELF_PAINTING_TYPES.has(node.type)) {
@@ -102,7 +116,6 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
     delete (style as Record<string, unknown>).borderRadius
   }
 
-  // For nested components (inside containers), don't wrap in another div
   const Wrapper = isNested ? React.Fragment : 'div'
   const wrapperProps = isNested ? {} : { style }
 
@@ -138,7 +151,6 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
         </Wrapper>
       )
     case 'Button': {
-      // Sanitize button href; pass visual styles through from style.
       const buttonProps = {
         ...node.props,
         href: sanitizeUrl(node.props.href),
@@ -185,11 +197,18 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
           />
         </Wrapper>
       )
-    case 'Input':
+    case 'Input': {
+      // Use the user-set label as the form field name so submissions are
+      // self-describing. The server applies the same regex so anything the
+      // client lets through is safe to store.
+      const label = (node.props.label as string) || ''
+      const explicitName = (node.props.name as string) || ''
+      const fieldName = sanitizeFieldName(explicitName || label || 'field')
       return (
         <Wrapper key={node.id} {...wrapperProps}>
           <InputComponent
             {...node.props}
+            name={fieldName}
             color={node.style.color}
             fontSize={node.style.fontSize}
             backgroundColor={node.style.backgroundColor}
@@ -198,6 +217,7 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
           />
         </Wrapper>
       )
+    }
     case 'Map':
       return (
         <Wrapper key={node.id} {...wrapperProps}>
@@ -212,19 +232,93 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
   }
 }
 
-export function RuntimeRenderer({ schema }: RuntimeRendererProps) {
+type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
+
+export function RuntimeRenderer({ schema, pageId }: RuntimeRendererProps) {
+  const [status, setStatus] = useState<SubmitStatus>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!pageId) {
+      setStatus('error')
+      setError('Form submission is only available on the published page.')
+      return
+    }
+    const form = e.currentTarget
+    const formData = new FormData(form)
+    const fields: Record<string, string> = {}
+    for (const [key, value] of formData.entries()) {
+      if (typeof value !== 'string') continue
+      const safeKey = sanitizeFieldName(key)
+      // Skip empty fields so we don't submit a junk record on a button
+      // click without any actual input.
+      const trimmed = value.trim()
+      if (!trimmed) continue
+      fields[safeKey] = trimmed.slice(0, 5000)
+    }
+
+    if (Object.keys(fields).length === 0) {
+      setStatus('error')
+      setError('Please fill in at least one field before submitting.')
+      return
+    }
+
+    setStatus('submitting')
+    setError(null)
+    try {
+      const res = await fetch(`/api/forms/${pageId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error?.message || `HTTP ${res.status}`)
+      }
+      setStatus('success')
+      form.reset()
+    } catch (err) {
+      setStatus('error')
+      setError(err instanceof Error ? err.message : 'Submission failed')
+    }
+  }
+
+  const banner = (() => {
+    if (status === 'submitting') return null
+    if (status === 'success') {
+      return (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2 rounded shadow text-sm">
+          Thanks! Your submission was received.
+        </div>
+      )
+    }
+    if (status === 'error' && error) {
+      return (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded shadow text-sm">
+          {error}
+        </div>
+      )
+    }
+    return null
+  })()
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-8">
-      <div
+      {banner}
+      <form
+        onSubmit={handleSubmit}
         className="bg-white shadow-lg relative"
         style={{
           width: schema.canvas.width,
           height: schema.canvas.height,
           backgroundColor: schema.canvas.background || '#ffffff',
+          opacity: status === 'submitting' ? 0.7 : 1,
+          pointerEvents: status === 'submitting' ? 'none' : 'auto',
         }}
       >
         {schema.nodes.map((node) => renderNode(node, false))}
-      </div>
+      </form>
     </div>
   )
 }

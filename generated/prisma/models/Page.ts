@@ -205,6 +205,7 @@ export type PageWhereInput = {
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   publishedVersion?: Prisma.XOR<Prisma.PageVersionNullableScalarRelationFilter, Prisma.PageVersionWhereInput> | null
   versions?: Prisma.PageVersionListRelationFilter
+  submissions?: Prisma.FormSubmissionListRelationFilter
 }
 
 export type PageOrderByWithRelationInput = {
@@ -219,6 +220,7 @@ export type PageOrderByWithRelationInput = {
   owner?: Prisma.UserOrderByWithRelationInput
   publishedVersion?: Prisma.PageVersionOrderByWithRelationInput
   versions?: Prisma.PageVersionOrderByRelationAggregateInput
+  submissions?: Prisma.FormSubmissionOrderByRelationAggregateInput
 }
 
 export type PageWhereUniqueInput = Prisma.AtLeast<{
@@ -236,6 +238,7 @@ export type PageWhereUniqueInput = Prisma.AtLeast<{
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   publishedVersion?: Prisma.XOR<Prisma.PageVersionNullableScalarRelationFilter, Prisma.PageVersionWhereInput> | null
   versions?: Prisma.PageVersionListRelationFilter
+  submissions?: Prisma.FormSubmissionListRelationFilter
 }, "id" | "publishedVersionId">
 
 export type PageOrderByWithAggregationInput = {
@@ -276,6 +279,7 @@ export type PageCreateInput = {
   owner: Prisma.UserCreateNestedOneWithoutPagesInput
   publishedVersion?: Prisma.PageVersionCreateNestedOneWithoutPublishedOnPageInput
   versions?: Prisma.PageVersionCreateNestedManyWithoutPageInput
+  submissions?: Prisma.FormSubmissionCreateNestedManyWithoutPageInput
 }
 
 export type PageUncheckedCreateInput = {
@@ -288,6 +292,7 @@ export type PageUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   versions?: Prisma.PageVersionUncheckedCreateNestedManyWithoutPageInput
+  submissions?: Prisma.FormSubmissionUncheckedCreateNestedManyWithoutPageInput
 }
 
 export type PageUpdateInput = {
@@ -300,6 +305,7 @@ export type PageUpdateInput = {
   owner?: Prisma.UserUpdateOneRequiredWithoutPagesNestedInput
   publishedVersion?: Prisma.PageVersionUpdateOneWithoutPublishedOnPageNestedInput
   versions?: Prisma.PageVersionUpdateManyWithoutPageNestedInput
+  submissions?: Prisma.FormSubmissionUpdateManyWithoutPageNestedInput
 }
 
 export type PageUncheckedUpdateInput = {
@@ -312,6 +318,7 @@ export type PageUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.PageVersionUncheckedUpdateManyWithoutPageNestedInput
+  submissions?: Prisma.FormSubmissionUncheckedUpdateManyWithoutPageNestedInput
 }
 
 export type PageCreateManyInput = {
@@ -484,6 +491,20 @@ export type PageUncheckedUpdateOneWithoutPublishedVersionNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PageUpdateToOneWithWhereWithoutPublishedVersionInput, Prisma.PageUpdateWithoutPublishedVersionInput>, Prisma.PageUncheckedUpdateWithoutPublishedVersionInput>
 }
 
+export type PageCreateNestedOneWithoutSubmissionsInput = {
+  create?: Prisma.XOR<Prisma.PageCreateWithoutSubmissionsInput, Prisma.PageUncheckedCreateWithoutSubmissionsInput>
+  connectOrCreate?: Prisma.PageCreateOrConnectWithoutSubmissionsInput
+  connect?: Prisma.PageWhereUniqueInput
+}
+
+export type PageUpdateOneRequiredWithoutSubmissionsNestedInput = {
+  create?: Prisma.XOR<Prisma.PageCreateWithoutSubmissionsInput, Prisma.PageUncheckedCreateWithoutSubmissionsInput>
+  connectOrCreate?: Prisma.PageCreateOrConnectWithoutSubmissionsInput
+  upsert?: Prisma.PageUpsertWithoutSubmissionsInput
+  connect?: Prisma.PageWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PageUpdateToOneWithWhereWithoutSubmissionsInput, Prisma.PageUpdateWithoutSubmissionsInput>, Prisma.PageUncheckedUpdateWithoutSubmissionsInput>
+}
+
 export type PageCreateWithoutOwnerInput = {
   id?: string
   title: string
@@ -493,6 +514,7 @@ export type PageCreateWithoutOwnerInput = {
   updatedAt?: Date | string
   publishedVersion?: Prisma.PageVersionCreateNestedOneWithoutPublishedOnPageInput
   versions?: Prisma.PageVersionCreateNestedManyWithoutPageInput
+  submissions?: Prisma.FormSubmissionCreateNestedManyWithoutPageInput
 }
 
 export type PageUncheckedCreateWithoutOwnerInput = {
@@ -504,6 +526,7 @@ export type PageUncheckedCreateWithoutOwnerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   versions?: Prisma.PageVersionUncheckedCreateNestedManyWithoutPageInput
+  submissions?: Prisma.FormSubmissionUncheckedCreateNestedManyWithoutPageInput
 }
 
 export type PageCreateOrConnectWithoutOwnerInput = {
@@ -555,6 +578,7 @@ export type PageCreateWithoutVersionsInput = {
   updatedAt?: Date | string
   owner: Prisma.UserCreateNestedOneWithoutPagesInput
   publishedVersion?: Prisma.PageVersionCreateNestedOneWithoutPublishedOnPageInput
+  submissions?: Prisma.FormSubmissionCreateNestedManyWithoutPageInput
 }
 
 export type PageUncheckedCreateWithoutVersionsInput = {
@@ -566,6 +590,7 @@ export type PageUncheckedCreateWithoutVersionsInput = {
   publishedVersionId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  submissions?: Prisma.FormSubmissionUncheckedCreateNestedManyWithoutPageInput
 }
 
 export type PageCreateOrConnectWithoutVersionsInput = {
@@ -582,6 +607,7 @@ export type PageCreateWithoutPublishedVersionInput = {
   updatedAt?: Date | string
   owner: Prisma.UserCreateNestedOneWithoutPagesInput
   versions?: Prisma.PageVersionCreateNestedManyWithoutPageInput
+  submissions?: Prisma.FormSubmissionCreateNestedManyWithoutPageInput
 }
 
 export type PageUncheckedCreateWithoutPublishedVersionInput = {
@@ -593,6 +619,7 @@ export type PageUncheckedCreateWithoutPublishedVersionInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   versions?: Prisma.PageVersionUncheckedCreateNestedManyWithoutPageInput
+  submissions?: Prisma.FormSubmissionUncheckedCreateNestedManyWithoutPageInput
 }
 
 export type PageCreateOrConnectWithoutPublishedVersionInput = {
@@ -620,6 +647,7 @@ export type PageUpdateWithoutVersionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   owner?: Prisma.UserUpdateOneRequiredWithoutPagesNestedInput
   publishedVersion?: Prisma.PageVersionUpdateOneWithoutPublishedOnPageNestedInput
+  submissions?: Prisma.FormSubmissionUpdateManyWithoutPageNestedInput
 }
 
 export type PageUncheckedUpdateWithoutVersionsInput = {
@@ -631,6 +659,7 @@ export type PageUncheckedUpdateWithoutVersionsInput = {
   publishedVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submissions?: Prisma.FormSubmissionUncheckedUpdateManyWithoutPageNestedInput
 }
 
 export type PageUpsertWithoutPublishedVersionInput = {
@@ -653,6 +682,7 @@ export type PageUpdateWithoutPublishedVersionInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   owner?: Prisma.UserUpdateOneRequiredWithoutPagesNestedInput
   versions?: Prisma.PageVersionUpdateManyWithoutPageNestedInput
+  submissions?: Prisma.FormSubmissionUpdateManyWithoutPageNestedInput
 }
 
 export type PageUncheckedUpdateWithoutPublishedVersionInput = {
@@ -661,6 +691,71 @@ export type PageUncheckedUpdateWithoutPublishedVersionInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   draftSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  versions?: Prisma.PageVersionUncheckedUpdateManyWithoutPageNestedInput
+  submissions?: Prisma.FormSubmissionUncheckedUpdateManyWithoutPageNestedInput
+}
+
+export type PageCreateWithoutSubmissionsInput = {
+  id?: string
+  title: string
+  slug?: string | null
+  draftSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  owner: Prisma.UserCreateNestedOneWithoutPagesInput
+  publishedVersion?: Prisma.PageVersionCreateNestedOneWithoutPublishedOnPageInput
+  versions?: Prisma.PageVersionCreateNestedManyWithoutPageInput
+}
+
+export type PageUncheckedCreateWithoutSubmissionsInput = {
+  id?: string
+  ownerId: string
+  title: string
+  slug?: string | null
+  draftSchema: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  publishedVersionId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  versions?: Prisma.PageVersionUncheckedCreateNestedManyWithoutPageInput
+}
+
+export type PageCreateOrConnectWithoutSubmissionsInput = {
+  where: Prisma.PageWhereUniqueInput
+  create: Prisma.XOR<Prisma.PageCreateWithoutSubmissionsInput, Prisma.PageUncheckedCreateWithoutSubmissionsInput>
+}
+
+export type PageUpsertWithoutSubmissionsInput = {
+  update: Prisma.XOR<Prisma.PageUpdateWithoutSubmissionsInput, Prisma.PageUncheckedUpdateWithoutSubmissionsInput>
+  create: Prisma.XOR<Prisma.PageCreateWithoutSubmissionsInput, Prisma.PageUncheckedCreateWithoutSubmissionsInput>
+  where?: Prisma.PageWhereInput
+}
+
+export type PageUpdateToOneWithWhereWithoutSubmissionsInput = {
+  where?: Prisma.PageWhereInput
+  data: Prisma.XOR<Prisma.PageUpdateWithoutSubmissionsInput, Prisma.PageUncheckedUpdateWithoutSubmissionsInput>
+}
+
+export type PageUpdateWithoutSubmissionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  draftSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  owner?: Prisma.UserUpdateOneRequiredWithoutPagesNestedInput
+  publishedVersion?: Prisma.PageVersionUpdateOneWithoutPublishedOnPageNestedInput
+  versions?: Prisma.PageVersionUpdateManyWithoutPageNestedInput
+}
+
+export type PageUncheckedUpdateWithoutSubmissionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  draftSchema?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  publishedVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.PageVersionUncheckedUpdateManyWithoutPageNestedInput
@@ -685,6 +780,7 @@ export type PageUpdateWithoutOwnerInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publishedVersion?: Prisma.PageVersionUpdateOneWithoutPublishedOnPageNestedInput
   versions?: Prisma.PageVersionUpdateManyWithoutPageNestedInput
+  submissions?: Prisma.FormSubmissionUpdateManyWithoutPageNestedInput
 }
 
 export type PageUncheckedUpdateWithoutOwnerInput = {
@@ -696,6 +792,7 @@ export type PageUncheckedUpdateWithoutOwnerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   versions?: Prisma.PageVersionUncheckedUpdateManyWithoutPageNestedInput
+  submissions?: Prisma.FormSubmissionUncheckedUpdateManyWithoutPageNestedInput
 }
 
 export type PageUncheckedUpdateManyWithoutOwnerInput = {
@@ -715,10 +812,12 @@ export type PageUncheckedUpdateManyWithoutOwnerInput = {
 
 export type PageCountOutputType = {
   versions: number
+  submissions: number
 }
 
 export type PageCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   versions?: boolean | PageCountOutputTypeCountVersionsArgs
+  submissions?: boolean | PageCountOutputTypeCountSubmissionsArgs
 }
 
 /**
@@ -738,6 +837,13 @@ export type PageCountOutputTypeCountVersionsArgs<ExtArgs extends runtime.Types.E
   where?: Prisma.PageVersionWhereInput
 }
 
+/**
+ * PageCountOutputType without action
+ */
+export type PageCountOutputTypeCountSubmissionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FormSubmissionWhereInput
+}
+
 
 export type PageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -751,6 +857,7 @@ export type PageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   publishedVersion?: boolean | Prisma.Page$publishedVersionArgs<ExtArgs>
   versions?: boolean | Prisma.Page$versionsArgs<ExtArgs>
+  submissions?: boolean | Prisma.Page$submissionsArgs<ExtArgs>
   _count?: boolean | Prisma.PageCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["page"]>
 
@@ -796,6 +903,7 @@ export type PageInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   publishedVersion?: boolean | Prisma.Page$publishedVersionArgs<ExtArgs>
   versions?: boolean | Prisma.Page$versionsArgs<ExtArgs>
+  submissions?: boolean | Prisma.Page$submissionsArgs<ExtArgs>
   _count?: boolean | Prisma.PageCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PageIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -813,6 +921,7 @@ export type $PagePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     owner: Prisma.$UserPayload<ExtArgs>
     publishedVersion: Prisma.$PageVersionPayload<ExtArgs> | null
     versions: Prisma.$PageVersionPayload<ExtArgs>[]
+    submissions: Prisma.$FormSubmissionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1220,6 +1329,7 @@ export interface Prisma__PageClient<T, Null = never, ExtArgs extends runtime.Typ
   owner<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   publishedVersion<T extends Prisma.Page$publishedVersionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Page$publishedVersionArgs<ExtArgs>>): Prisma.Prisma__PageVersionClient<runtime.Types.Result.GetResult<Prisma.$PageVersionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   versions<T extends Prisma.Page$versionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Page$versionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PageVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  submissions<T extends Prisma.Page$submissionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Page$submissionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FormSubmissionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1693,6 +1803,30 @@ export type Page$versionsArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.PageVersionScalarFieldEnum | Prisma.PageVersionScalarFieldEnum[]
+}
+
+/**
+ * Page.submissions
+ */
+export type Page$submissionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FormSubmission
+   */
+  select?: Prisma.FormSubmissionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FormSubmission
+   */
+  omit?: Prisma.FormSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FormSubmissionInclude<ExtArgs> | null
+  where?: Prisma.FormSubmissionWhereInput
+  orderBy?: Prisma.FormSubmissionOrderByWithRelationInput | Prisma.FormSubmissionOrderByWithRelationInput[]
+  cursor?: Prisma.FormSubmissionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FormSubmissionScalarFieldEnum | Prisma.FormSubmissionScalarFieldEnum[]
 }
 
 /**

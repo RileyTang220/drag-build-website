@@ -197,7 +197,7 @@ const nodes: ComponentNode[] = [
   {
     id: id('contact-submit'),
     type: 'Button',
-    props: { label: 'Send Message', href: '#' },
+    props: { label: 'Send Message', href: '#', action: 'submit' },
     style: {
       position: 'absolute', left: 60, top: 1510, width: 200, height: 48,
       backgroundColor: '#2b579a', color: '#ffffff', borderRadius: 6, fontSize: 16, fontWeight: 600,

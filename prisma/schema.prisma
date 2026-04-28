@@ -82,9 +82,10 @@ model Page {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  owner            User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  publishedVersion PageVersion?  @relation("PublishedVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  publishedVersion PageVersion?     @relation("PublishedVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
   versions         PageVersion[]
+  submissions      FormSubmission[]
 
   @@index([ownerId])
   @@index([slug])
@@ -102,4 +103,25 @@ model PageVersion {
   publishedOnPage Page? @relation("PublishedVersion")
 
   @@index([pageId])
+}
+
+// Form submissions captured from published pages.
+//
+// `data` is JSONB so the same table can hold any form layout. Indexes:
+//  - (pageId, submittedAt DESC) → fast listing of latest submissions per page
+//  - (ip, submittedAt DESC)     → fast rate-limit check by client IP
+//
+// `pageId` cascades on Page delete so orphan submissions never linger.
+model FormSubmission {
+  id          String   @id @default(cuid())
+  pageId      String
+  data        Json
+  ip          String?
+  userAgent   String?  @db.Text
+  submittedAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, submittedAt(sort: Desc)])
+  @@index([ip, submittedAt(sort: Desc)])
 }

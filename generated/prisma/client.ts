@@ -69,3 +69,8 @@ export type Page = Prisma.PageModel
  * 
  */
 export type PageVersion = Prisma.PageVersionModel
+/**
+ * Model FormSubmission
+ * 
+ */
+export type FormSubmission = Prisma.FormSubmissionModel

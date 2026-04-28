@@ -196,7 +196,7 @@ const nodes: ComponentNode[] = [
   {
     id: id('reserve-submit'),
     type: 'Button',
-    props: { label: 'Reserve Table', href: '#' },
+    props: { label: 'Reserve Table', href: '#', action: 'submit' },
     style: {
       position: 'absolute', left: 500, top: 2180, width: 200, height: 52,
       backgroundColor: '#dc2626', color: '#ffffff', borderRadius: 6, fontSize: 16, fontWeight: 700,

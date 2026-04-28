@@ -1,13 +1,19 @@
 // Button component for rendering buttons.
 //
-// We let unset props fall through as `undefined` rather than baking in
-// fallback colors here — when the runtime renderer forgets to pass `color`
-// through from `node.style`, hard-coded fallbacks silently overwrite the
-// user's choice on the published page (see Bug: heading/text/box color
-// not changing in preview/publish).
+// Two `action` modes:
+//   - 'link'   (default) — renders <a href> for navigation
+//   - 'submit' — renders <button type="submit"> so a parent <form> can
+//                catch it. Used by the form-submission feature.
+//
+// Visual props (color / bg / radius) are passed through from `node.style`
+// at the renderer layer. We intentionally do NOT bake fallback colors here
+// — if the renderer forgets to pass a value, we'd rather inherit than
+// silently overwrite the user's choice (see prior bug: "颜色没有改变").
 interface ButtonComponentProps {
   label?: string
   href?: string
+  /** 'link' = anchor; 'submit' = form submit button. */
+  action?: 'link' | 'submit'
   backgroundColor?: string
   color?: string
   borderRadius?: number
@@ -16,6 +22,7 @@ interface ButtonComponentProps {
 export function ButtonComponent({
   label = 'Button',
   href = '#',
+  action = 'link',
   backgroundColor,
   color,
   borderRadius,
@@ -36,6 +43,14 @@ export function ButtonComponent({
     textDecoration: 'none',
   }
 
+  if (action === 'submit') {
+    return (
+      <button type="submit" style={buttonStyle}>
+        {label}
+      </button>
+    )
+  }
+
   if (href && href !== '#') {
     return (
       <a href={href} style={buttonStyle}>
@@ -44,5 +59,9 @@ export function ButtonComponent({
     )
   }
 
-  return <button style={buttonStyle}>{label}</button>
+  return (
+    <button type="button" style={buttonStyle}>
+      {label}
+    </button>
+  )
 }
