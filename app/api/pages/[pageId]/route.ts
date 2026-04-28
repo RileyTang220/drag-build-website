@@ -1,128 +1,105 @@
 // API route for individual page operations
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { Prisma } from '@/generated/prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { apiError, fromZodError, parseJsonBody } from '@/lib/validation/apiError'
+import { pageIdParam, updatePageInput } from '@/lib/validation/pageSchema'
+import logger from '@/lib/logger'
+
 // GET /api/pages/[pageId] - Get page draft (owner only)
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ pageId: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ pageId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
-    const { pageId } = await params
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.user?.id) return apiError('UNAUTHORIZED', 'Sign in required')
+
+    const { pageId: rawId } = await params
+    const idResult = pageIdParam.safeParse(rawId)
+    if (!idResult.success) return fromZodError(idResult.error)
 
     const page = await prisma.page.findFirst({
-      where: {
-        id: pageId,
-        ownerId: session.user.id, // Ensure user isolation
-      },
+      where: { id: idResult.data, ownerId: session.user.id },
     })
 
-    if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 })
-    }
+    if (!page) return apiError('NOT_FOUND', 'Page not found')
 
     return NextResponse.json({ page })
   } catch (error) {
-    console.error('Error fetching page:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch page' },
-      { status: 500 }
-    )
+    logger.error('GET /api/pages/[pageId] failed', error)
+    return apiError('INTERNAL', 'Failed to fetch page')
   }
 }
 
 // PUT /api/pages/[pageId] - Update page draft (owner only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ pageId: string }> }
+  { params }: { params: Promise<{ pageId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
-    const { pageId } = await params
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.user?.id) return apiError('UNAUTHORIZED', 'Sign in required')
 
-    const body = await request.json()
-    const { draftSchema, title, slug } = body
+    const { pageId: rawId } = await params
+    const idResult = pageIdParam.safeParse(rawId)
+    if (!idResult.success) return fromZodError(idResult.error)
 
-    // Verify ownership
+    const parsed = await parseJsonBody(request, updatePageInput)
+    if ('response' in parsed) return parsed.response
+    const { draftSchema, title, slug } = parsed.data
+
+    // Verify ownership before update
     const existingPage = await prisma.page.findFirst({
-      where: {
-        id: pageId,
-        ownerId: session.user.id,
-      },
+      where: { id: idResult.data, ownerId: session.user.id },
+      select: { id: true },
     })
-
-    if (!existingPage) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 })
-    }
+    if (!existingPage) return apiError('NOT_FOUND', 'Page not found')
 
     const page = await prisma.page.update({
-      where: {
-        id: pageId,
-      },
+      where: { id: idResult.data },
       data: {
-        ...(draftSchema && { draftSchema }),
-        ...(title && { title }),
-        ...(slug !== undefined && { slug }),
+        ...(draftSchema !== undefined && {
+          draftSchema: draftSchema as unknown as Prisma.InputJsonValue,
+        }),
+        ...(title !== undefined && { title }),
+        ...(slug !== undefined && { slug: slug === '' ? null : slug }),
       },
     })
 
     return NextResponse.json({ page })
   } catch (error) {
-    console.error('Error updating page:', error)
-    return NextResponse.json(
-      { error: 'Failed to update page' },
-      { status: 500 }
-    )
+    logger.error('PUT /api/pages/[pageId] failed', error)
+    return apiError('INTERNAL', 'Failed to update page')
   }
 }
 
 // DELETE /api/pages/[pageId] - Delete page (owner only)
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ pageId: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ pageId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
-    const { pageId } = await params
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.user?.id) return apiError('UNAUTHORIZED', 'Sign in required')
 
-    // Verify ownership before delete
+    const { pageId: rawId } = await params
+    const idResult = pageIdParam.safeParse(rawId)
+    if (!idResult.success) return fromZodError(idResult.error)
+
     const page = await prisma.page.findFirst({
-      where: {
-        id: pageId,
-        ownerId: session.user.id,
-      },
+      where: { id: idResult.data, ownerId: session.user.id },
+      select: { id: true },
     })
+    if (!page) return apiError('NOT_FOUND', 'Page not found')
 
-    if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 })
-    }
-
-    await prisma.page.delete({
-      where: {
-        id: pageId,
-      },
-    })
+    await prisma.page.delete({ where: { id: idResult.data } })
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting page:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete page' },
-      { status: 500 }
-    )
+    logger.error('DELETE /api/pages/[pageId] failed', error)
+    return apiError('INTERNAL', 'Failed to delete page')
   }
 }

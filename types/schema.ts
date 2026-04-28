@@ -26,7 +26,7 @@ export interface ComponentStyle {
 export interface ComponentNode {
   id: string
   type: ComponentType
-  props: Record<string, any>
+  props: Record<string, unknown>
   style: ComponentStyle
   children?: ComponentNode[]
 }

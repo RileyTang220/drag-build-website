@@ -5,22 +5,22 @@ import { Prisma } from '@/generated/prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PageSchema } from '@/types/schema'
+import { apiError, parseJsonBody } from '@/lib/validation/apiError'
+import { createPageInput } from '@/lib/validation/pageSchema'
+import logger from '@/lib/logger'
+
 // GET /api/pages - List all pages for the current user
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return apiError('UNAUTHORIZED', 'Sign in required')
     }
 
     const pages = await prisma.page.findMany({
-      where: {
-        ownerId: session.user.id,
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
+      where: { ownerId: session.user.id },
+      orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -33,11 +33,8 @@ export async function GET() {
 
     return NextResponse.json({ pages })
   } catch (error) {
-    console.error('Error fetching pages:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch pages' },
-      { status: 500 }
-    )
+    logger.error('GET /api/pages failed', error)
+    return apiError('INTERNAL', 'Failed to fetch pages')
   }
 }
 
@@ -45,13 +42,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return apiError('UNAUTHORIZED', 'Sign in required')
     }
 
-    const body = await request.json()
-    const { title, slug, canvasWidth, canvasHeight } = body
+    const parsed = await parseJsonBody(request, createPageInput)
+    if ('response' in parsed) return parsed.response
+    const { title, slug, canvasWidth, canvasHeight } = parsed.data
 
     const w =
       typeof canvasWidth === 'number' && Number.isFinite(canvasWidth)
@@ -62,17 +60,10 @@ export async function POST(request: NextRequest) {
         ? Math.round(Math.min(1600, Math.max(240, canvasHeight)))
         : 800
 
-    // Default empty schema（画布尺寸可由客户端按编辑器可用区域传入）
     const defaultSchema: PageSchema = {
-      canvas: {
-        width: w,
-        height: h,
-        background: '#ffffff',
-      },
+      canvas: { width: w, height: h, background: '#ffffff' },
       nodes: [],
-      meta: {
-        title: title || 'Untitled Page',
-      },
+      meta: { title: title || 'Untitled Page' },
     }
 
     const page = await prisma.page.create({
@@ -86,10 +77,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ page })
   } catch (error) {
-    console.error('Error creating page:', error)
-    return NextResponse.json(
-      { error: 'Failed to create page' },
-      { status: 500 }
-    )
+    logger.error('POST /api/pages failed', error)
+    return apiError('INTERNAL', 'Failed to create page')
   }
 }

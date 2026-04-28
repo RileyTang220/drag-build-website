@@ -7,8 +7,12 @@ import { prisma } from './prisma'
 export const authOptions: NextAuthOptions = {
   // 生产环境必填：在 Vercel 配置 NEXTAUTH_SECRET（如 openssl rand -base64 32）
   secret: process.env.NEXTAUTH_SECRET,
+  // PrismaAdapter expects the legacy v5 PrismaClient generic shape, but we
+  // generate the v7 client with `prisma-client` provider. The runtime contract
+  // (the model accessors used by the adapter: User, Account, Session,
+  // VerificationToken) is unchanged, so we cast through unknown.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: PrismaAdapter(prisma as unknown as any),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,

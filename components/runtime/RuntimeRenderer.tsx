@@ -64,9 +64,10 @@ function sanitizeStyle(style: ComponentStyle | Record<string, unknown>): React.C
   return sanitized
 }
 
-// Sanitize URL to prevent XSS
-function sanitizeUrl(url: string): string {
-  if (!url) return '#'
+// Sanitize URL to prevent XSS. Accepts unknown so callers can pass values
+// pulled out of an untyped props bag without an extra cast.
+function sanitizeUrl(url: unknown): string {
+  if (typeof url !== 'string' || !url) return '#'
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:')) {
     return url
   }

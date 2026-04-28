@@ -4,60 +4,54 @@ import { getServerSession } from 'next-auth'
 import { Prisma } from '@/generated/prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { apiError, fromZodError } from '@/lib/validation/apiError'
+import { pageIdParam, pageSchemaZ } from '@/lib/validation/pageSchema'
+import logger from '@/lib/logger'
 
 // POST /api/pages/[pageId]/publish - Publish page draft to a version
 export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ pageId: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ pageId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions)
-    const { pageId } = await params
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.user?.id) return apiError('UNAUTHORIZED', 'Sign in required')
+
+    const { pageId: rawId } = await params
+    const idResult = pageIdParam.safeParse(rawId)
+    if (!idResult.success) return fromZodError(idResult.error)
 
     // Verify ownership
     const page = await prisma.page.findFirst({
-      where: {
-        id: pageId,
-        ownerId: session.user.id,
-      },
+      where: { id: idResult.data, ownerId: session.user.id },
     })
+    if (!page) return apiError('NOT_FOUND', 'Page not found')
 
-    if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 })
-    }
+    // Re-validate the draft before snapshotting it as an immutable version.
+    // Drafts are validated on write, but we re-check here to defend against
+    // schema changes or any data that bypassed validation historically.
+    const draftResult = pageSchemaZ.safeParse(page.draftSchema)
+    if (!draftResult.success) return fromZodError(draftResult.error)
 
-    // Create a new immutable version from draft
     const version = await prisma.pageVersion.create({
       data: {
-        pageId: pageId,
-        schema: page.draftSchema as unknown as Prisma.InputJsonValue,
+        pageId: idResult.data,
+        schema: draftResult.data as unknown as Prisma.InputJsonValue,
       },
     })
 
-    // Update page to point to the new published version
     await prisma.page.update({
-      where: {
-        id: pageId,
-      },
-      data: {
-        publishedVersionId: version.id,
-      },
+      where: { id: idResult.data },
+      data: { publishedVersionId: version.id },
     })
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       versionId: version.id,
       publishedAt: version.publishedAt,
     })
   } catch (error) {
-    console.error('Error publishing page:', error)
-    return NextResponse.json(
-      { error: 'Failed to publish page' },
-      { status: 500 }
-    )
+    logger.error('POST /api/pages/[pageId]/publish failed', error)
+    return apiError('INTERNAL', 'Failed to publish page')
   }
 }

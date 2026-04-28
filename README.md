@@ -95,8 +95,22 @@ A visual drag-and-drop website builder, built with Next.js, TypeScript, and Post
 
 - All API routes verify user authentication
 - User data isolation enforced at database level
+- All API inputs validated with Zod (shape, types, size, depth, unique ids)
+- Page schema capped at 500 nodes / 1MB / depth 8
 - Runtime renderer uses whitelist for components and styles
 - URLs are sanitized to prevent XSS attacks
+- Editor and Runtime are wrapped in React error boundaries; route-level
+  `error.tsx` and `global-error.tsx` catch server errors
+
+## Continuous Integration
+
+GitHub Actions runs three parallel jobs on every push and PR to `main`:
+
+- `lint` — ESLint
+- `typecheck` — `tsc --noEmit`
+- `build` — `prisma generate && next build`
+
+See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Development Roadmap
 

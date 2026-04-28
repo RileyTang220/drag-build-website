@@ -3,6 +3,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { RuntimeRenderer } from '@/components/runtime/RuntimeRenderer'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PageSchema } from '@/types/schema'
 
 export default function PublicPage({ params }: { params: Promise<{ pageId: string }> }) {
@@ -12,6 +13,7 @@ export default function PublicPage({ params }: { params: Promise<{ pageId: strin
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     const loadPublishedPage = async () => {
       try {
         const res = await fetch(`/api/public/${pageId}`)
@@ -19,15 +21,20 @@ export default function PublicPage({ params }: { params: Promise<{ pageId: strin
           throw new Error('Page not found or not published')
         }
         const data = await res.json()
-        setSchema(data.schema as PageSchema)
+        if (!cancelled) setSchema(data.schema as PageSchema)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load page')
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load page')
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadPublishedPage()
+    return () => {
+      cancelled = true
+    }
   }, [pageId])
 
   if (loading) {
@@ -46,5 +53,11 @@ export default function PublicPage({ params }: { params: Promise<{ pageId: strin
     )
   }
 
-  return <RuntimeRenderer schema={schema} />
+  // Wrap the runtime in an error boundary so a single malformed node never
+  // white-screens the published page for end users.
+  return (
+    <ErrorBoundary scope="Runtime">
+      <RuntimeRenderer schema={schema} />
+    </ErrorBoundary>
+  )
 }
