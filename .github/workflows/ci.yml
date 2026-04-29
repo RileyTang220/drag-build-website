@@ -65,13 +65,26 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run test:run
+
   db-migrate:
     name: DB Migrate (production)
     runs-on: ubuntu-latest
     # Only run for trusted events on main:
-    #  - push to main after lint/typecheck/build all green
+    #  - push to main after lint/typecheck/build/test all green
     #  - manual dispatch from the Actions UI
-    needs: [lint, typecheck, build]
+    needs: [lint, typecheck, build, test]
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'workflow_dispatch'

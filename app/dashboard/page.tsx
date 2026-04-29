@@ -5,12 +5,16 @@ import { useEffect, useState } from 'react'
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { PagePreview } from '@/components/dashboard/PagePreview'
+import type { PageSchema } from '@/types/schema'
 
 interface Page {
   id: string
   title: string
   slug: string | null
   publishedVersionId: string | null
+  /** Optional — server omits or returns null for legacy pages without a draft. */
+  draftSchema: PageSchema | null
   createdAt: string
   updatedAt: string
 }
@@ -112,9 +116,10 @@ export default function DashboardPage() {
                 className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
               >
                 <Link href={`/editor/${page.id}`} className="block">
-                  <div className="aspect-[4/3] bg-gray-100 flex items-center justify-center">
-                    <div className="text-4xl text-gray-300">📄</div>
-                  </div>
+                  <PagePreview
+                    schema={page.draftSchema}
+                    className="aspect-[4/3]"
+                  />
                   <div className="p-4">
                     <h3 className="font-medium text-gray-900 truncate">{page.title}</h3>
                     <p className="text-xs text-gray-500 mt-0.5">

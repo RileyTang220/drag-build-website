@@ -27,6 +27,10 @@ export async function GET() {
         title: true,
         slug: true,
         publishedVersionId: true,
+        // Drafts power dashboard thumbnails. Schemas are capped at ~1MB
+        // by the page-update Zod limits, so the cumulative payload stays
+        // reasonable even for users with dozens of pages.
+        draftSchema: true,
         createdAt: true,
         updatedAt: true,
       },

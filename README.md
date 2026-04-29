@@ -102,13 +102,32 @@ A visual drag-and-drop website builder, built with Next.js, TypeScript, and Post
 - Editor and Runtime are wrapped in React error boundaries; route-level
   `error.tsx` and `global-error.tsx` catch server errors
 
+## Testing
+
+Pure logic is covered by Vitest:
+
+```bash
+npm run test           # watch
+npm run test:run       # one-shot (used by CI)
+npm run test:coverage  # report under coverage/
+```
+
+Test files live in `tests/`. Targets so far: snapping algorithm, Zod
+validators (page schema, form submission, API errors), component registry,
+and template integrity (every template must round-trip through `pageSchemaZ`).
+
 ## Continuous Integration
 
-GitHub Actions runs three parallel jobs on every push and PR to `main`:
+GitHub Actions runs four parallel jobs on every push and PR to `main`:
 
 - `lint` — ESLint
 - `typecheck` — `tsc --noEmit`
 - `build` — `prisma generate && next build`
+- `test` — `vitest run`
+
+A fifth `db-migrate` job runs only on `main` after the four above pass; it
+applies pending Prisma migrations against the production database via a
+GitHub `production` Environment with required reviewer approval.
 
 See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import {
   DndContext,
   DragEndEvent,
+  DragMoveEvent,
   DragStartEvent,
   DragOverlay,
   useSensor,
@@ -25,6 +26,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { PageSchema, ComponentNode, ComponentType } from '@/types/schema'
 import { getDefaultCanvasSize } from '@/lib/editorLayout'
 import { getDefaultProps, getDefaultStyle } from '@/components/registry'
+import { computeSnap } from '@/lib/editor/snapping'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,9 @@ const AUTOSAVE_DELAY_MS = 500
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.25
+/** Snap activation distance in *screen* pixels. Translated to canvas-space
+ *  by dividing by zoom so it stays the same on-screen at any zoom level. */
+const SNAP_THRESHOLD_PX = 6
 function canvasBounds(schema: PageSchema) {
   if (schema.canvas.width != null && schema.canvas.height != null) {
     return { w: schema.canvas.width, h: schema.canvas.height }
@@ -125,7 +130,7 @@ export function Editor({ pageId }: EditorProps) {
     return () => document.removeEventListener('pointermove', onMove)
   }, [])
 
-  const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom } =
+  const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom, setDragGuides } =
     useEditorStore()
 
   // Subscribe to zundo's temporal store. We watch only the lengths so the
@@ -253,6 +258,30 @@ export function Editor({ pageId }: EditorProps) {
     if (saveDraftTimer.current) clearTimeout(saveDraftTimer.current)
   }, [])
 
+  // ── Snap modifier ────────────────────────────────────────────────────────────
+  // Adjusts the dragged element's transform so it locks onto edges/centers
+  // of nearby nodes (and the canvas itself). Same algorithm runs in
+  // `handleDragMove` to publish guide lines for the visual overlay.
+
+  const snapModifier = useCallback<Modifier>(
+    (args) => {
+      if (!schema) return args.transform
+      if (args.active?.data.current?.type !== 'canvas-node') return args.transform
+      const result = computeSnap({
+        schema,
+        activeNodeId: args.active.id as string,
+        delta: { x: args.transform.x / zoom, y: args.transform.y / zoom },
+        threshold: SNAP_THRESHOLD_PX / zoom,
+      })
+      return {
+        ...args.transform,
+        x: result.snappedDelta.x * zoom,
+        y: result.snappedDelta.y * zoom,
+      }
+    },
+    [schema, zoom],
+  )
+
   // ── Drag handlers ────────────────────────────────────────────────────────────
 
   const handleDragStart = useCallback(
@@ -260,8 +289,29 @@ export function Editor({ pageId }: EditorProps) {
     []
   )
 
+  const handleDragMove = useCallback(
+    (e: DragMoveEvent) => {
+      if (!schema) return
+      if (e.active.data.current?.type !== 'canvas-node') {
+        setDragGuides({ vertical: [], horizontal: [] })
+        return
+      }
+      const result = computeSnap({
+        schema,
+        activeNodeId: e.active.id as string,
+        delta: { x: e.delta.x / zoom, y: e.delta.y / zoom },
+        threshold: SNAP_THRESHOLD_PX / zoom,
+      })
+      setDragGuides(result.guides)
+    },
+    [schema, zoom, setDragGuides],
+  )
+
   const handleDragEnd = useCallback(
     (e: DragEndEvent) => {
+      // Always clear guide lines when a drag finishes — even if the user
+      // dropped outside any droppable, otherwise they'd linger forever.
+      setDragGuides({ vertical: [], horizontal: [] })
       const { active, over } = e
       setActiveId(null)
       if (!over || !schema) return
@@ -330,7 +380,7 @@ export function Editor({ pageId }: EditorProps) {
         updateNode(nodeId, { style: { ...node.style, left, top } })
       }
     },
-    [schema, zoom, addNode, setSelectedId, updateNode]
+    [schema, zoom, addNode, setSelectedId, updateNode, setDragGuides]
   )
 
   // ── Publish ──────────────────────────────────────────────────────────────────
@@ -372,8 +422,11 @@ export function Editor({ pageId }: EditorProps) {
   return (
     <DndContext
       sensors={sensors}
-      modifiers={[restrictCanvasNodeToArtboard]}
+      // Order matters: restrict first (clamp to artboard), then snap so
+      // alignment kicks in inside the constrained range.
+      modifiers={[restrictCanvasNodeToArtboard, snapModifier]}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
