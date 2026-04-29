@@ -5,12 +5,15 @@ import { useDroppable } from '@dnd-kit/core'
 import { useEditorStore } from '@/store/editorStore'
 import { ComponentRenderer } from './ComponentRenderer'
 import { GuideOverlay } from './GuideOverlay'
+import { CollabCursors } from './CollabCursors'
+import type { PeerState } from '@/lib/collab/session'
 
 interface CanvasProps {
   zoom?: number
+  peers?: PeerState[]
 }
 
-export function Canvas({ zoom = 1 }: CanvasProps) {
+export function Canvas({ zoom = 1, peers = [] }: CanvasProps) {
   const { schema, selectedId, setSelectedId, dragGuides } = useEditorStore()
 
   const { setNodeRef } = useDroppable({
@@ -59,14 +62,12 @@ export function Canvas({ zoom = 1 }: CanvasProps) {
               onSelect={() => setSelectedId(node.id)}
             />
           ))}
-          {/* Alignment guides — placed inside the artboard so they share the
-              same scale transform; vector-effect=non-scaling-stroke keeps the
-              line 1px on screen at any zoom. */}
           <GuideOverlay
             guides={dragGuides}
             canvasWidth={schema.canvas.width}
             canvasHeight={schema.canvas.height}
           />
+          <CollabCursors peers={peers} schema={schema} zoom={zoom} />
         </div>
       </div>
     </div>

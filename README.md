@@ -102,6 +102,41 @@ A visual drag-and-drop website builder, built with Next.js, TypeScript, and Post
 - Editor and Runtime are wrapped in React error boundaries; route-level
   `error.tsx` and `global-error.tsx` catch server errors
 
+## Real-time collaboration (MVP)
+
+The editor runs a Yjs CRDT session per page so multiple browser tabs / users
+editing the same page see each other's changes in real time, plus live
+cursors and selection outlines.
+
+- Transport: `y-webrtc` peer-to-peer (signaling via `wss://signaling.yjs.dev`).
+  Zero infrastructure — works as long as both peers can reach the public
+  signaling server. For production, deploy a private signaling server and
+  TURN server.
+- Data: a single `Y.Map` ("app") holds the page schema. Local store
+  changes push into Yjs; remote schema replaces local state with `zundo`
+  history paused so peer edits don't pollute *your* undo stack.
+- Awareness: `y-protocols/awareness` carries each user's color, name,
+  pointer position (canvas-space, throttled via `requestAnimationFrame`),
+  and currently selected node id.
+
+### Try it locally
+
+1. `npm run dev`
+2. Open the same `/editor/<pageId>` URL in two browser windows
+3. Drag an element in one window → watch it move in the other
+4. Move your cursor over the canvas → watch your colored arrow + name
+   appear in the other window
+
+### Known MVP limitations
+
+- Whole-schema replace ≈ "last write wins" on concurrent edits to the same
+  field. Promoting nodes into a `Y.Array<Y.Map>` would give per-field CRDT.
+- Public signaling (`signaling.yjs.dev`) is best-effort; corporate networks
+  may block WebRTC. Production should run a dedicated signaling + TURN.
+- Auto-save races: every connected client writes to Postgres on its own
+  debounce. Final state still converges via Yjs; only the persisted state
+  is "last writer wins" at the DB layer.
+
 ## Testing
 
 Pure logic is covered by Vitest:
@@ -131,11 +166,3 @@ GitHub `production` Environment with required reviewer approval.
 
 See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
-## Development Roadmap
-
-- [ ] Undo/redo functionality
-- [ ] Component resizing
-- [ ] Image upload support
-- [ ] More component types
-- [ ] Custom domains
-- [ ] Collaboration features

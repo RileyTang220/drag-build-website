@@ -27,6 +27,9 @@ import { PageSchema, ComponentNode, ComponentType } from '@/types/schema'
 import { getDefaultCanvasSize } from '@/lib/editorLayout'
 import { getDefaultProps, getDefaultStyle } from '@/components/registry'
 import { computeSnap } from '@/lib/editor/snapping'
+import { CollabSession, type PeerState } from '@/lib/collab/session'
+import { randomCollabUser, type CollabUser } from '@/lib/collab/user'
+import { CollabAvatars } from './CollabAvatars'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -109,7 +112,7 @@ interface EditorProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function Editor({ pageId }: EditorProps) {
-  const { status: sessionStatus } = useSession()
+  const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
 
   const [loading,  setLoading]  = useState(true)
@@ -130,8 +133,19 @@ export function Editor({ pageId }: EditorProps) {
     return () => document.removeEventListener('pointermove', onMove)
   }, [])
 
-  const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom, setDragGuides } =
+  const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom, setDragGuides, selectedId } =
     useEditorStore()
+
+  // ── Real-time collaboration (Yjs + y-webrtc) ─────────────────────────────
+  // One CollabSession per editor mount. The session syncs `schema` between
+  // peers and broadcasts cursor / selection awareness.
+
+  const collabSessionRef = useRef<CollabSession | null>(null)
+  const applyingRemoteRef = useRef(false)
+  const [collabSelf] = useState<CollabUser>(() =>
+    randomCollabUser(session?.user?.name ?? undefined),
+  )
+  const [collabPeers, setCollabPeers] = useState<PeerState[]>([])
 
   // Subscribe to zundo's temporal store. We watch only the lengths so the
   // editor re-renders just enough to flip the toolbar buttons enabled/
@@ -219,6 +233,101 @@ export function Editor({ pageId }: EditorProps) {
     load()
     return () => { cancelled = true }
   }, [pageId, sessionStatus, setSchema, clearHistory])
+
+  // ── Collab session lifecycle ─────────────────────────────────────────────
+  // Starts after the schema has been loaded so peers see a meaningful
+  // initial seed, and tears down on unmount so the WebRTC connections /
+  // signaling listeners don't leak.
+
+  useEffect(() => {
+    if (loading) return
+    const initial = useEditorStore.getState().schema
+    if (!initial) return
+
+    const session = new CollabSession({
+      pageId,
+      user: collabSelf,
+      initialSchema: initial,
+      onRemoteSchema: (remoteSchema) => {
+        // Apply remote diffs without polluting OUR undo stack and without
+        // bouncing back into setSchema → CollabSession.setSchema → echo.
+        const temporal = useEditorStore.temporal.getState()
+        applyingRemoteRef.current = true
+        temporal.pause()
+        try {
+          useEditorStore.setState({ schema: remoteSchema })
+        } finally {
+          temporal.resume()
+          applyingRemoteRef.current = false
+        }
+      },
+      onPeers: setCollabPeers,
+    })
+    collabSessionRef.current = session
+
+    // Local schema → Yjs. Skip when the change *originated* from a peer.
+    const unsub = useEditorStore.subscribe((state, prev) => {
+      if (state.schema === prev.schema) return
+      if (applyingRemoteRef.current) return
+      if (!state.schema) return
+      session.setSchema(state.schema)
+    })
+
+    return () => {
+      unsub()
+      session.destroy()
+      collabSessionRef.current = null
+      setCollabPeers([])
+    }
+  }, [pageId, loading, collabSelf])
+
+  // Selection → awareness
+  useEffect(() => {
+    collabSessionRef.current?.setSelectedNodeId(selectedId)
+  }, [selectedId])
+
+  // Cursor → awareness. Throttled via rAF inside an artboard pointermove
+  // listener; we don't broadcast every single mouse event over the network.
+  useEffect(() => {
+    if (loading) return
+    const artboard = document.getElementById('canvas-artboard')
+    if (!artboard) return
+    let rafId: number | null = null
+    let pending: { x: number; y: number } | null = null
+
+    const flush = () => {
+      rafId = null
+      if (pending) {
+        collabSessionRef.current?.setCursor(pending)
+      }
+    }
+    const onMove = (e: PointerEvent) => {
+      const rect = artboard.getBoundingClientRect()
+      const x = (e.clientX - rect.left) / zoom
+      const y = (e.clientY - rect.top) / zoom
+      // Only publish when the pointer is actually over the canvas.
+      if (x < 0 || y < 0 || x > artboard.clientWidth || y > artboard.clientHeight) {
+        if (pending) {
+          pending = null
+          collabSessionRef.current?.setCursor(null)
+        }
+        return
+      }
+      pending = { x, y }
+      if (rafId == null) rafId = requestAnimationFrame(flush)
+    }
+    const onLeave = () => {
+      pending = null
+      collabSessionRef.current?.setCursor(null)
+    }
+    artboard.addEventListener('pointermove', onMove)
+    artboard.addEventListener('pointerleave', onLeave)
+    return () => {
+      artboard.removeEventListener('pointermove', onMove)
+      artboard.removeEventListener('pointerleave', onLeave)
+      if (rafId != null) cancelAnimationFrame(rafId)
+    }
+  }, [loading, zoom])
 
   // ── Auto-save ────────────────────────────────────────────────────────────────
 
@@ -452,6 +561,8 @@ export function Editor({ pageId }: EditorProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <CollabAvatars self={collabSelf} peers={collabPeers} />
+            <span className="w-px h-5 bg-[#3c3c3c] mx-1" />
             {/* Save status indicator */}
             <SaveIndicator saving={saving} error={saveError} />
 
@@ -479,7 +590,7 @@ export function Editor({ pageId }: EditorProps) {
         <div className="flex flex-1 overflow-hidden">
           <ComponentPalette />
           <div className="flex-1 overflow-auto bg-[#f5f5f5] p-6" id="canvas-drop-zone">
-            <Canvas zoom={zoom} />
+            <Canvas zoom={zoom} peers={collabPeers} />
           </div>
           <PropertyPanel />
         </div>
