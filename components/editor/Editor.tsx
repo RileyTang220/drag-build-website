@@ -27,6 +27,14 @@ import { PageSchema, ComponentNode, ComponentType } from '@/types/schema'
 import { getDefaultCanvasSize } from '@/lib/editorLayout'
 import { getDefaultProps, getDefaultStyle } from '@/components/registry'
 import { computeSnap } from '@/lib/editor/snapping'
+import {
+  BREAKPOINTS,
+  BREAKPOINT_CANVAS_WIDTH,
+  BREAKPOINT_LABEL,
+  effectiveStyle,
+  styleUpdatePayload,
+  type Breakpoint,
+} from '@/lib/editor/breakpoints'
 import { CollabSession, type PeerState } from '@/lib/collab/session'
 import { randomCollabUser, type CollabUser } from '@/lib/collab/user'
 import { CollabAvatars } from './CollabAvatars'
@@ -40,12 +48,15 @@ const ZOOM_STEP = 0.25
 /** Snap activation distance in *screen* pixels. Translated to canvas-space
  *  by dividing by zoom so it stays the same on-screen at any zoom level. */
 const SNAP_THRESHOLD_PX = 6
-function canvasBounds(schema: PageSchema) {
-  if (schema.canvas.width != null && schema.canvas.height != null) {
-    return { w: schema.canvas.width, h: schema.canvas.height }
+function canvasBounds(schema: PageSchema, bp: Breakpoint) {
+  // Width depends on the active breakpoint — switching to mobile narrows
+  // the artboard so clamp/snap math has to follow.
+  const width = BREAKPOINT_CANVAS_WIDTH[bp] ?? schema.canvas.width
+  if (schema.canvas.height != null) {
+    return { w: width, h: schema.canvas.height }
   }
-  const { width, height } = getDefaultCanvasSize(window.innerWidth, window.innerHeight)
-  return { w: width, h: height }
+  const fallback = getDefaultCanvasSize(window.innerWidth, window.innerHeight)
+  return { w: width, h: fallback.height }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -133,7 +144,7 @@ export function Editor({ pageId }: EditorProps) {
     return () => document.removeEventListener('pointermove', onMove)
   }, [])
 
-  const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom, setDragGuides, selectedId } =
+  const { schema, setSchema, setSelectedId, addNode, updateNode, setZoom, zoom, setDragGuides, selectedId, currentBreakpoint, setCurrentBreakpoint } =
     useEditorStore()
 
   // ── Real-time collaboration (Yjs + y-webrtc) ─────────────────────────────
@@ -453,9 +464,12 @@ export function Editor({ pageId }: EditorProps) {
           }
         }
 
-        const { w: cw, h: ch } = canvasBounds(schema)
+        const { w: cw, h: ch } = canvasBounds(schema, currentBreakpoint)
         const { left, top } = clampPosition(x, y, nodeW, nodeH, cw, ch)
 
+        // Newly added nodes always start as desktop-base. Per-breakpoint
+        // overrides only get created when the user later edits them while
+        // a non-desktop breakpoint is active.
         const node: ComponentNode = {
           id:    `node-${Date.now()}`,
           type:  componentType,
@@ -474,22 +488,26 @@ export function Editor({ pageId }: EditorProps) {
         const node   = schema.nodes.find((n) => n.id === nodeId)
         if (!node) return
 
-        const nodeW = node.style.width  ?? 100
-        const nodeH = node.style.height ?? 50
+        // Read sizes / positions from the EFFECTIVE style for the active
+        // breakpoint — overrides may make the node smaller on mobile.
+        const eff = effectiveStyle(node, currentBreakpoint, schema.canvas.width)
+        const nodeW = eff.width  ?? 100
+        const nodeH = eff.height ?? 50
 
-        const { w: cw, h: ch } = canvasBounds(schema)
+        const { w: cw, h: ch } = canvasBounds(schema, currentBreakpoint)
         const { left, top } = clampPosition(
-          node.style.left + e.delta.x / zoom,
-          node.style.top  + e.delta.y / zoom,
+          eff.left + e.delta.x / zoom,
+          eff.top  + e.delta.y / zoom,
           nodeW, nodeH,
           cw,
           ch,
         )
 
-        updateNode(nodeId, { style: { ...node.style, left, top } })
+        // Write into the right slot (base on desktop, override otherwise).
+        updateNode(nodeId, styleUpdatePayload(node, { left, top }, currentBreakpoint))
       }
     },
-    [schema, zoom, addNode, setSelectedId, updateNode, setDragGuides]
+    [schema, zoom, addNode, setSelectedId, updateNode, setDragGuides, currentBreakpoint]
   )
 
   // ── Publish ──────────────────────────────────────────────────────────────────
@@ -561,6 +579,11 @@ export function Editor({ pageId }: EditorProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <BreakpointSwitcher
+              current={currentBreakpoint}
+              onChange={setCurrentBreakpoint}
+            />
+            <span className="w-px h-5 bg-[#3c3c3c] mx-1" />
             <CollabAvatars self={collabSelf} peers={collabPeers} />
             <span className="w-px h-5 bg-[#3c3c3c] mx-1" />
             {/* Save status indicator */}
@@ -570,7 +593,10 @@ export function Editor({ pageId }: EditorProps) {
             <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
 
             <a
-              href={`/p/${pageId}`}
+              // Carry the current breakpoint so a Mobile-mode author opening
+              // Preview from a desktop browser actually sees their mobile
+              // layout, not the desktop fallback.
+              href={`/p/${pageId}?preview=${currentBreakpoint}`}
               target="_blank"
               rel="noopener noreferrer"
               className="h-8 px-3 flex items-center text-[#cccccc] hover:bg-[#2d2d2d] rounded text-sm"
@@ -648,6 +674,67 @@ function ZoomControls({ zoom, onZoomIn, onZoomOut }: ZoomControlsProps) {
         +
       </button>
     </div>
+  )
+}
+
+interface BreakpointSwitcherProps {
+  current: Breakpoint
+  onChange: (bp: Breakpoint) => void
+}
+
+function BreakpointSwitcher({ current, onChange }: BreakpointSwitcherProps) {
+  // Width values shown as a tooltip so users see the canvas size each
+  // breakpoint will render at. Glyphs are hand-drawn SVGs (single 16x16
+  // viewBox) for crisp rendering at any DPI; emoji rendering varies by OS.
+  return (
+    <div className="flex items-center gap-0.5 bg-[#2d2d2d] rounded p-0.5">
+      {BREAKPOINTS.map((bp) => {
+        const isActive = bp === current
+        return (
+          <button
+            key={bp}
+            onClick={() => onChange(bp)}
+            aria-label={`Edit ${BREAKPOINT_LABEL[bp]} layout`}
+            title={`${BREAKPOINT_LABEL[bp]}${
+              BREAKPOINT_CANVAS_WIDTH[bp]
+                ? ` · ${BREAKPOINT_CANVAS_WIDTH[bp]}px`
+                : ''
+            }`}
+            className={`h-7 w-9 flex items-center justify-center rounded text-[#cccccc] hover:bg-[#3c3c3c] transition-colors ${
+              isActive ? 'bg-[#0e639c] text-white hover:bg-[#1177bb]' : ''
+            }`}
+          >
+            <BreakpointGlyph bp={bp} />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function BreakpointGlyph({ bp }: { bp: Breakpoint }) {
+  if (bp === 'desktop') {
+    return (
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="2" width="14" height="9" rx="1" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M5 14h6M8 11v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  if (bp === 'tablet') {
+    return (
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <rect x="3" y="1" width="10" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="8" cy="13" r="0.7" fill="currentColor" />
+      </svg>
+    )
+  }
+  // mobile
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <rect x="4.5" y="1" width="7" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8" cy="13" r="0.6" fill="currentColor" />
+    </svg>
   )
 }
 

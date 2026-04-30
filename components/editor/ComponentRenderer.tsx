@@ -3,6 +3,7 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { ComponentNode } from '@/types/schema'
+import { effectiveStyle, type Breakpoint } from '@/lib/editor/breakpoints'
 import { TextComponent } from '../components/TextComponent'
 import { HeadingComponent } from '../components/HeadingComponent'
 import { ImageComponent } from '../components/ImageComponent'
@@ -16,12 +17,18 @@ interface ComponentRendererProps {
   node: ComponentNode
   isSelected: boolean
   onSelect: () => void
+  /** Active breakpoint — drives effective style merging. */
+  breakpoint: Breakpoint
+  /** Schema's desktop canvas width — needed for fluid auto-scaling. */
+  desktopCanvasWidth: number
 }
 
 export function ComponentRenderer({
   node,
   isSelected,
   onSelect,
+  breakpoint,
+  desktopCanvasWidth,
 }: ComponentRendererProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -32,39 +39,37 @@ export function ComponentRenderer({
       },
     })
 
+  const s = effectiveStyle(node, breakpoint, desktopCanvasWidth)
+
   const style: React.CSSProperties = {
     position: 'absolute',
-    left: `${node.style.left}px`,
-    top: `${node.style.top}px`,
-    width: node.style.width ? `${node.style.width}px` : 'auto',
-    height: node.style.height ? `${node.style.height}px` : 'auto',
-    zIndex: node.style.zIndex || 1,
+    left: `${s.left}px`,
+    top: `${s.top}px`,
+    width: s.width ? `${s.width}px` : 'auto',
+    height: s.height ? `${s.height}px` : 'auto',
+    zIndex: s.zIndex || 1,
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined,
-    borderWidth: isSelected ? 2 : (node.style.borderWidth ?? 0),
+    borderWidth: isSelected ? 2 : (s.borderWidth ?? 0),
     borderStyle: 'solid',
-    borderColor: isSelected ? '#2b579a' : (node.style.borderColor || 'transparent'),
+    borderColor: isSelected ? '#2b579a' : (s.borderColor || 'transparent'),
     cursor: 'move',
     opacity: isDragging ? 0.5 : 1,
-    fontSize: node.style.fontSize ? `${node.style.fontSize}px` : undefined,
-    color: node.style.color,
-    // The Container, Input, Map and Divider components paint their own
-    // background (often together with border-radius / clipping). Letting the
-    // wrapper also set bg would double-render and made bg color changes look
-    // stale when only one layer updated.
+    fontSize: s.fontSize ? `${s.fontSize}px` : undefined,
+    color: s.color,
     backgroundColor:
       node.type === 'Container' ||
       node.type === 'Input' ||
       node.type === 'Map' ||
       node.type === 'Divider'
         ? undefined
-        : node.style.backgroundColor,
-    borderRadius: node.style.borderRadius ? `${node.style.borderRadius}px` : undefined,
-    padding: node.style.padding ? `${node.style.padding}px` : undefined,
-    margin: node.style.margin ? `${node.style.margin}px` : undefined,
-    textAlign: node.style.textAlign,
-    fontWeight: node.style.fontWeight,
+        : s.backgroundColor,
+    borderRadius: s.borderRadius ? `${s.borderRadius}px` : undefined,
+    padding: s.padding ? `${s.padding}px` : undefined,
+    margin: s.margin ? `${s.margin}px` : undefined,
+    textAlign: s.textAlign,
+    fontWeight: s.fontWeight,
   }
 
   const renderComponent = () => {
@@ -73,65 +78,62 @@ export function ComponentRenderer({
         return (
           <TextComponent
             {...node.props}
-            color={node.style.color}
-            fontSize={node.style.fontSize}
-            fontWeight={node.style.fontWeight}
-            textAlign={node.style.textAlign}
+            color={s.color}
+            fontSize={s.fontSize}
+            fontWeight={s.fontWeight}
+            textAlign={s.textAlign}
           />
         )
       case 'Heading':
         return (
           <HeadingComponent
             {...node.props}
-            color={node.style.color}
-            fontSize={node.style.fontSize}
-            fontWeight={node.style.fontWeight}
-            textAlign={node.style.textAlign}
+            color={s.color}
+            fontSize={s.fontSize}
+            fontWeight={s.fontWeight}
+            textAlign={s.textAlign}
           />
         )
       case 'Image':
         return <ImageComponent {...node.props} />
       case 'Button':
         return (
-          // Editor: force action='link' so a stray click on a "Submit"
-          // button doesn't post the (empty) canvas form. Real submit
-          // behavior is wired up only in the runtime renderer.
           <ButtonComponent
             {...node.props}
             action="link"
-            backgroundColor={node.style.backgroundColor}
-            color={node.style.color}
-            borderRadius={node.style.borderRadius}
+            backgroundColor={s.backgroundColor}
+            color={s.color}
+            borderRadius={s.borderRadius}
           />
         )
       case 'Container':
-        return <ContainerComponent node={node} />
+        return <ContainerComponent node={{ ...node, style: s }} />
       case 'Divider':
         return (
           <DividerComponent
-            backgroundColor={node.style.backgroundColor}
-            borderStyle={node.style.borderStyle}
-            borderColor={node.style.borderColor}
-            borderWidth={node.style.borderWidth}
+            backgroundColor={s.backgroundColor}
+            borderStyle={s.borderStyle}
+            borderColor={s.borderColor}
+            borderWidth={s.borderWidth}
           />
         )
       case 'Input':
         return (
           <InputComponent
             {...node.props}
-            color={node.style.color}
-            fontSize={node.style.fontSize}
-            backgroundColor={node.style.backgroundColor}
-            borderColor={node.style.borderColor}
-            borderRadius={node.style.borderRadius}
-            editable={false} /* canvas is for layout, not data entry */
+            color={s.color}
+            fontSize={s.fontSize}
+            backgroundColor={s.backgroundColor}
+            borderColor={s.borderColor}
+            borderRadius={s.borderRadius}
+            editable={false}
           />
         )
       case 'Map':
         return (
           <MapComponent
             {...node.props}
-            borderRadius={node.style.borderRadius}
+            borderRadius={s.borderRadius}
           />
         )
       default:

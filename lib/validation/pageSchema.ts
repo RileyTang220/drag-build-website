@@ -69,6 +69,38 @@ const componentStyleSchema = z
   })
   .strict()
 
+// Breakpoint overrides: same fields as base but every one is optional, plus
+// `position` is dropped (always 'absolute'; allowing it in overrides would
+// invite layout chaos).
+const componentStyleOverrideSchema = z
+  .object({
+    left: z.number().finite().min(-LIMITS.MAX_COORD).max(LIMITS.MAX_COORD).optional(),
+    top: z.number().finite().min(-LIMITS.MAX_COORD).max(LIMITS.MAX_COORD).optional(),
+    width: z.number().finite().min(0).max(LIMITS.MAX_COORD).optional(),
+    height: z.number().finite().min(0).max(LIMITS.MAX_COORD).optional(),
+    rotate: z.number().finite().min(-360).max(360).optional(),
+    zIndex: z.number().int().min(-1000).max(1000).optional(),
+    fontSize: z.number().finite().min(1).max(512).optional(),
+    color: colorSchema,
+    backgroundColor: colorSchema,
+    borderColor: colorSchema,
+    borderWidth: z.number().finite().min(0).max(64).optional(),
+    borderStyle: z.enum(['solid', 'dashed', 'dotted']).optional(),
+    borderRadius: z.number().finite().min(0).max(512).optional(),
+    padding: z.number().finite().min(0).max(512).optional(),
+    margin: z.number().finite().min(0).max(512).optional(),
+    textAlign: z.enum(['left', 'center', 'right']).optional(),
+    fontWeight: z.union([z.string().max(20), z.number().int().min(1).max(1000)]).optional(),
+  })
+  .strict()
+
+const styleOverridesSchema = z
+  .object({
+    tablet: componentStyleOverrideSchema.optional(),
+    mobile: componentStyleOverrideSchema.optional(),
+  })
+  .strict()
+
 // ─── Recursive node schema ─────────────────────────────────────────────────────
 // Zod recursive types use z.lazy + a typed alias.
 //
@@ -82,6 +114,7 @@ export interface ComponentNodeInput {
   type: ComponentType
   props: Record<string, unknown>
   style: z.infer<typeof componentStyleSchema>
+  styleOverrides?: z.infer<typeof styleOverridesSchema>
   children?: ComponentNodeInput[]
 }
 
@@ -100,6 +133,7 @@ export const componentNodeSchema: z.ZodType<ComponentNodeInput> = z.lazy(() =>
       type: componentTypeSchema,
       props: propsSchema,
       style: componentStyleSchema,
+      styleOverrides: styleOverridesSchema.optional(),
       children: z.array(componentNodeSchema).optional(),
     })
     .strict(),

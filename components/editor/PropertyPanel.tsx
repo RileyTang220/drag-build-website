@@ -2,6 +2,12 @@
 'use client'
 
 import { useEditorStore } from '@/store/editorStore'
+import {
+  BREAKPOINT_LABEL,
+  effectiveStyle,
+  styleUpdatePayload,
+} from '@/lib/editor/breakpoints'
+import type { ComponentStyle } from '@/types/schema'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -25,7 +31,8 @@ const inputCls =
   'w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-[#2b579a] focus:border-[#2b579a]'
 
 export function PropertyPanel() {
-  const { schema, selectedId, updateNode, deleteNode } = useEditorStore()
+  const { schema, selectedId, currentBreakpoint, updateNode, deleteNode } =
+    useEditorStore()
 
   if (!schema || !selectedId) {
     return (
@@ -38,11 +45,18 @@ export function PropertyPanel() {
   const node = schema.nodes.find((n) => n.id === selectedId)
   if (!node) return null
 
+  // Effective style is what the user sees at the current breakpoint.
+  // Field inputs read from here; writes route to the right slot.
+  const s = effectiveStyle(node, currentBreakpoint, schema.canvas.width)
+
   const handlePropChange = (key: string, value: unknown) => {
     updateNode(selectedId, { props: { ...node.props, [key]: value } })
   }
-  const handleStyleChange = (key: string, value: unknown) => {
-    updateNode(selectedId, { style: { ...node.style, [key]: value } })
+  const handleStyleChange = (key: keyof ComponentStyle, value: unknown) => {
+    updateNode(
+      selectedId,
+      styleUpdatePayload(node, { [key]: value }, currentBreakpoint),
+    )
   }
 
   return (
@@ -56,13 +70,19 @@ export function PropertyPanel() {
           Delete
         </button>
       </div>
+      {currentBreakpoint !== 'desktop' && (
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-800">
+          Editing <strong>{BREAKPOINT_LABEL[currentBreakpoint]}</strong> override.
+          Changes apply only at this breakpoint; desktop styles stay intact.
+        </div>
+      )}
       <div className="p-4">
         <Section title="Position & Size">
           <div className="grid grid-cols-2 gap-2">
             <Field label="X">
               <input
                 type="number"
-                value={node.style.left}
+                value={s.left}
                 onChange={(e) => handleStyleChange('left', parseInt(e.target.value) || 0)}
                 className={inputCls}
               />
@@ -70,7 +90,7 @@ export function PropertyPanel() {
             <Field label="Y">
               <input
                 type="number"
-                value={node.style.top}
+                value={s.top}
                 onChange={(e) => handleStyleChange('top', parseInt(e.target.value) || 0)}
                 className={inputCls}
               />
@@ -78,7 +98,7 @@ export function PropertyPanel() {
             <Field label="Width">
               <input
                 type="number"
-                value={node.style.width ?? ''}
+                value={s.width ?? ''}
                 onChange={(e) => handleStyleChange('width', e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="auto"
                 className={inputCls}
@@ -87,7 +107,7 @@ export function PropertyPanel() {
             <Field label="Height">
               <input
                 type="number"
-                value={node.style.height ?? ''}
+                value={s.height ?? ''}
                 onChange={(e) => handleStyleChange('height', e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="auto"
                 className={inputCls}
@@ -109,7 +129,7 @@ export function PropertyPanel() {
             <Field label="Font Size">
               <input
                 type="number"
-                value={node.style.fontSize ?? 16}
+                value={s.fontSize ?? 16}
                 onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value) || 16)}
                 className={inputCls}
               />
@@ -117,7 +137,7 @@ export function PropertyPanel() {
             <Field label="Color">
               <input
                 type="color"
-                value={node.style.color || '#000000'}
+                value={s.color || '#000000'}
                 onChange={(e) => handleStyleChange('color', e.target.value)}
                 className="w-full h-8 border border-gray-200 rounded cursor-pointer"
               />
@@ -152,14 +172,14 @@ export function PropertyPanel() {
               <Field label="Font Size">
                 <input
                   type="number"
-                  value={node.style.fontSize ?? 32}
+                  value={s.fontSize ?? 32}
                   onChange={(e) => handleStyleChange('fontSize', parseInt(e.target.value) || 32)}
                   className={inputCls}
                 />
               </Field>
               <Field label="Weight">
                 <select
-                  value={String(node.style.fontWeight ?? 700)}
+                  value={String(s.fontWeight ?? 700)}
                   onChange={(e) => handleStyleChange('fontWeight', parseInt(e.target.value))}
                   className={inputCls}
                 >
@@ -174,7 +194,7 @@ export function PropertyPanel() {
             <Field label="Color">
               <input
                 type="color"
-                value={node.style.color || '#111827'}
+                value={s.color || '#111827'}
                 onChange={(e) => handleStyleChange('color', e.target.value)}
                 className="w-full h-8 border border-gray-200 rounded cursor-pointer"
               />
@@ -186,7 +206,7 @@ export function PropertyPanel() {
                     key={a}
                     onClick={() => handleStyleChange('textAlign', a)}
                     className={`flex-1 py-1.5 text-xs rounded border ${
-                      node.style.textAlign === a
+                      s.textAlign === a
                         ? 'bg-[#2b579a] text-white border-[#2b579a]'
                         : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                     }`}
@@ -262,7 +282,7 @@ export function PropertyPanel() {
               <Field label="BG">
                 <input
                   type="color"
-                  value={node.style.backgroundColor || '#3b82f6'}
+                  value={s.backgroundColor || '#3b82f6'}
                   onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
                   className="w-full h-8 border border-gray-200 rounded cursor-pointer"
                 />
@@ -270,7 +290,7 @@ export function PropertyPanel() {
               <Field label="Text">
                 <input
                   type="color"
-                  value={node.style.color || '#ffffff'}
+                  value={s.color || '#ffffff'}
                   onChange={(e) => handleStyleChange('color', e.target.value)}
                   className="w-full h-8 border border-gray-200 rounded cursor-pointer"
                 />
@@ -284,7 +304,7 @@ export function PropertyPanel() {
             <Field label="Background">
               <input
                 type="color"
-                value={node.style.backgroundColor || '#f3f4f6'}
+                value={s.backgroundColor || '#f3f4f6'}
                 onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
                 className="w-full h-8 border border-gray-200 rounded cursor-pointer"
               />
@@ -292,7 +312,7 @@ export function PropertyPanel() {
             <Field label="Border Radius">
               <input
                 type="number"
-                value={node.style.borderRadius ?? 0}
+                value={s.borderRadius ?? 0}
                 onChange={(e) => handleStyleChange('borderRadius', parseInt(e.target.value) || 0)}
                 className={inputCls}
               />
@@ -305,14 +325,14 @@ export function PropertyPanel() {
             <Field label="Color">
               <input
                 type="color"
-                value={node.style.backgroundColor || '#e5e7eb'}
+                value={s.backgroundColor || '#e5e7eb'}
                 onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
                 className="w-full h-8 border border-gray-200 rounded cursor-pointer"
               />
             </Field>
             <Field label="Style">
               <select
-                value={node.style.borderStyle ?? 'solid'}
+                value={s.borderStyle ?? 'solid'}
                 onChange={(e) => handleStyleChange('borderStyle', e.target.value)}
                 className={inputCls}
               >
@@ -326,7 +346,7 @@ export function PropertyPanel() {
                 type="number"
                 min={1}
                 max={20}
-                value={node.style.height ?? 1}
+                value={s.height ?? 1}
                 onChange={(e) => handleStyleChange('height', parseInt(e.target.value) || 1)}
                 className={inputCls}
               />
@@ -383,7 +403,7 @@ export function PropertyPanel() {
             <Field label="Border Radius">
               <input
                 type="number"
-                value={node.style.borderRadius ?? 0}
+                value={s.borderRadius ?? 0}
                 onChange={(e) => handleStyleChange('borderRadius', parseInt(e.target.value) || 0)}
                 className={inputCls}
               />

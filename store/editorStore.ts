@@ -14,6 +14,7 @@
 import { create, type StateCreator } from 'zustand'
 import { temporal } from 'zundo'
 import { PageSchema, ComponentNode } from '@/types/schema'
+import type { Breakpoint } from '@/lib/editor/breakpoints'
 
 export interface DragGuides {
   vertical: number[]
@@ -26,6 +27,9 @@ interface EditorState {
   schema: PageSchema | null
   selectedId: string | null
   zoom: number
+  /** Active breakpoint the editor is *previewing/editing for*. UI-only;
+   *  excluded from undo and from collab sync. */
+  currentBreakpoint: Breakpoint
   /**
    * Live alignment guides published by the dnd-kit drag handlers. Always
    * `NO_GUIDES` when no drag is in progress. Excluded from undo history
@@ -35,6 +39,7 @@ interface EditorState {
   setSchema: (schema: PageSchema) => void
   setSelectedId: (id: string | null) => void
   setZoom: (zoom: number) => void
+  setCurrentBreakpoint: (bp: Breakpoint) => void
   setDragGuides: (guides: DragGuides) => void
   addNode: (node: ComponentNode) => void
   updateNode: (id: string, updates: Partial<ComponentNode>) => void
@@ -60,10 +65,12 @@ const editorStateCreator: StateCreator<EditorState> = (set) => ({
   schema: null,
   selectedId: null,
   zoom: 1,
+  currentBreakpoint: 'desktop',
   dragGuides: NO_GUIDES,
   setSchema: (schema) => set({ schema }),
   setSelectedId: (id) => set({ selectedId: id }),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(2, zoom)) }),
+  setCurrentBreakpoint: (bp) => set({ currentBreakpoint: bp }),
   setDragGuides: (guides) => set({ dragGuides: guides }),
   addNode: (node) =>
     set((state) => {

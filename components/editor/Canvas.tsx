@@ -3,6 +3,7 @@
 
 import { useDroppable } from '@dnd-kit/core'
 import { useEditorStore } from '@/store/editorStore'
+import { BREAKPOINT_CANVAS_WIDTH } from '@/lib/editor/breakpoints'
 import { ComponentRenderer } from './ComponentRenderer'
 import { GuideOverlay } from './GuideOverlay'
 import { CollabCursors } from './CollabCursors'
@@ -14,7 +15,8 @@ interface CanvasProps {
 }
 
 export function Canvas({ zoom = 1, peers = [] }: CanvasProps) {
-  const { schema, selectedId, setSelectedId, dragGuides } = useEditorStore()
+  const { schema, selectedId, setSelectedId, dragGuides, currentBreakpoint } =
+    useEditorStore()
 
   const { setNodeRef } = useDroppable({
     id: 'canvas',
@@ -28,6 +30,14 @@ export function Canvas({ zoom = 1, peers = [] }: CanvasProps) {
       </div>
     )
   }
+
+  // Switching to tablet/mobile narrows the artboard. Height scales by
+  // the same factor so the canvas doesn't look stretched / squashed
+  // relative to its desktop aspect ratio.
+  const canvasWidth =
+    BREAKPOINT_CANVAS_WIDTH[currentBreakpoint] ?? schema.canvas.width
+  const widthFactor = canvasWidth / schema.canvas.width
+  const canvasHeight = Math.round(schema.canvas.height * widthFactor)
 
   return (
     <div className="flex items-center justify-center min-h-full">
@@ -47,8 +57,8 @@ export function Canvas({ zoom = 1, peers = [] }: CanvasProps) {
           ref={setNodeRef}
           className="bg-white relative overflow-hidden"
           style={{
-            width: schema.canvas.width,
-            height: schema.canvas.height,
+            width: canvasWidth,
+            height: canvasHeight,
             backgroundColor: schema.canvas.background || '#ffffff',
             transform: `scale(${zoom})`,
             transformOrigin: 'center center',
@@ -60,12 +70,14 @@ export function Canvas({ zoom = 1, peers = [] }: CanvasProps) {
               node={node}
               isSelected={selectedId === node.id}
               onSelect={() => setSelectedId(node.id)}
+              breakpoint={currentBreakpoint}
+              desktopCanvasWidth={schema.canvas.width}
             />
           ))}
           <GuideOverlay
             guides={dragGuides}
-            canvasWidth={schema.canvas.width}
-            canvasHeight={schema.canvas.height}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
           />
           <CollabCursors peers={peers} schema={schema} zoom={zoom} />
         </div>

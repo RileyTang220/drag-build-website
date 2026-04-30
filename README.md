@@ -102,6 +102,25 @@ A visual drag-and-drop website builder, built with Next.js, TypeScript, and Post
 - Editor and Runtime are wrapped in React error boundaries; route-level
   `error.tsx` and `global-error.tsx` catch server errors
 
+## Responsive breakpoints
+
+Each `ComponentNode` has a base `style` (= desktop) plus optional
+`styleOverrides.tablet` / `styleOverrides.mobile` partial overrides. At
+render time the effective style is `base ∪ override`, so overrides only
+need to specify the fields that differ.
+
+- **Editor**: a toolbar switcher (Desktop / Tablet / Mobile) sets the
+  current breakpoint. The artboard re-clamps to that breakpoint's canvas
+  width (768 / 375). Property panel writes go to the right slot — base
+  `style` on desktop, `styleOverrides[bp]` on tablet/mobile. Drag handlers
+  read effective dimensions via `effectiveStyle`.
+- **Runtime**: `RuntimeRenderer` listens to `window` resize events and
+  picks a breakpoint via `detectBreakpoint(viewportWidth)`. Thresholds
+  match Tailwind's `sm` (640) and `lg` (1024) — the same schema renders
+  three different layouts depending on the visitor's screen.
+- **Validation**: the Zod schema accepts `styleOverrides` as a strict
+  partial of the base style with `position` excluded (always `'absolute'`).
+
 ## Real-time collaboration (MVP)
 
 The editor runs a Yjs CRDT session per page so multiple browser tabs / users

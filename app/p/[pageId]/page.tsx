@@ -1,13 +1,29 @@
-// Public page route - renders published pages
+// Public page route - renders published pages.
+//
+// `?preview=mobile|tablet|desktop` query forces a specific breakpoint
+// instead of deriving it from the viewport. The editor's "Preview"
+// button uses this so authors can verify their tablet/mobile overrides
+// from a desktop browser without resizing the window.
 'use client'
 
 import { useEffect, useState, use } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RuntimeRenderer } from '@/components/runtime/RuntimeRenderer'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PageSchema } from '@/types/schema'
+import { BREAKPOINTS, type Breakpoint } from '@/lib/editor/breakpoints'
+
+function parseBreakpoint(value: string | null): Breakpoint | undefined {
+  if (!value) return undefined
+  return (BREAKPOINTS as readonly string[]).includes(value)
+    ? (value as Breakpoint)
+    : undefined
+}
 
 export default function PublicPage({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = use(params)
+  const searchParams = useSearchParams()
+  const forceBreakpoint = parseBreakpoint(searchParams.get('preview'))
   const [schema, setSchema] = useState<PageSchema | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +73,20 @@ export default function PublicPage({ params }: { params: Promise<{ pageId: strin
   // white-screens the published page for end users.
   return (
     <ErrorBoundary scope="Runtime">
-      <RuntimeRenderer schema={schema} pageId={pageId} />
+      <RuntimeRenderer
+        schema={schema}
+        pageId={pageId}
+        forceBreakpoint={forceBreakpoint}
+      />
+      {forceBreakpoint && <PreviewBanner breakpoint={forceBreakpoint} />}
     </ErrorBoundary>
+  )
+}
+
+function PreviewBanner({ breakpoint }: { breakpoint: Breakpoint }) {
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#0f172a] text-white text-xs px-3 py-1.5 rounded-full shadow-lg z-50">
+      Preview · {breakpoint}
+    </div>
   )
 }

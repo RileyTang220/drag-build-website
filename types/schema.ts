@@ -39,7 +39,17 @@ export interface ComponentNode {
   id: string
   type: ComponentType
   props: Record<string, unknown>
+  /** Base style — applied at desktop breakpoint and inherited by smaller ones. */
   style: ComponentStyle
+  /**
+   * Optional per-breakpoint overrides. Each entry is a partial style that
+   * merges over the base when rendering at that breakpoint. Missing keys
+   * inherit from the base.
+   */
+  styleOverrides?: {
+    tablet?: Partial<ComponentStyle>
+    mobile?: Partial<ComponentStyle>
+  }
   children?: ComponentNode[]
 }
 

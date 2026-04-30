@@ -6,13 +6,19 @@
 // because the editor doesn't (yet) have a "Form group" container concept.
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   COMPONENT_TYPES,
   PageSchema,
   ComponentNode,
   ComponentStyle,
 } from '@/types/schema'
+import {
+  BREAKPOINT_CANVAS_WIDTH,
+  detectBreakpoint,
+  effectiveStyle,
+  type Breakpoint,
+} from '@/lib/editor/breakpoints'
 import { TextComponent } from '../components/TextComponent'
 import { HeadingComponent } from '../components/HeadingComponent'
 import { ImageComponent } from '../components/ImageComponent'
@@ -29,6 +35,13 @@ interface RuntimeRendererProps {
    * without a backing page row.
    */
   pageId?: string
+  /**
+   * Force a specific breakpoint instead of deriving it from viewport
+   * width. Used by the editor's Preview button (`?preview=mobile`) so
+   * authors can validate their tablet/mobile overrides from a desktop
+   * browser without resizing the window.
+   */
+  forceBreakpoint?: Breakpoint
 }
 
 const ALLOWED_TYPES: ReadonlySet<string> = new Set(COMPONENT_TYPES)
@@ -104,10 +117,19 @@ function sanitizeFieldName(name: string): string {
   return cleaned || 'field'
 }
 
-function renderNode(node: ComponentNode, isNested: boolean = false): React.ReactNode {
+function renderNode(
+  node: ComponentNode,
+  bp: Breakpoint,
+  desktopWidth: number,
+  isNested: boolean = false,
+): React.ReactNode {
   if (!ALLOWED_TYPES.has(node.type)) return null
 
-  const style = sanitizeStyle(node.style)
+  const eff = effectiveStyle(node, bp, desktopWidth)
+  // Replace node.style with the merged-for-breakpoint style downstream.
+  const styledNode = { ...node, style: eff }
+
+  const style = sanitizeStyle(eff)
   if (SELF_PAINTING_TYPES.has(node.type)) {
     delete (style as Record<string, unknown>).backgroundColor
     delete (style as Record<string, unknown>).borderColor
@@ -125,10 +147,10 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
         <Wrapper key={node.id} {...wrapperProps}>
           <TextComponent
             {...node.props}
-            color={node.style.color}
-            fontSize={node.style.fontSize}
-            fontWeight={node.style.fontWeight}
-            textAlign={node.style.textAlign}
+            color={eff.color}
+            fontSize={eff.fontSize}
+            fontWeight={eff.fontWeight}
+            textAlign={eff.textAlign}
           />
         </Wrapper>
       )
@@ -137,10 +159,10 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
         <Wrapper key={node.id} {...wrapperProps}>
           <HeadingComponent
             {...node.props}
-            color={node.style.color}
-            fontSize={node.style.fontSize}
-            fontWeight={node.style.fontWeight}
-            textAlign={node.style.textAlign}
+            color={eff.color}
+            fontSize={eff.fontSize}
+            fontWeight={eff.fontWeight}
+            textAlign={eff.textAlign}
           />
         </Wrapper>
       )
@@ -159,9 +181,9 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
         <Wrapper key={node.id} {...wrapperProps}>
           <ButtonComponent
             {...buttonProps}
-            backgroundColor={node.style.backgroundColor}
-            color={node.style.color}
-            borderRadius={node.style.borderRadius}
+            backgroundColor={eff.backgroundColor}
+            color={eff.color}
+            borderRadius={eff.borderRadius}
           />
         </Wrapper>
       )
@@ -173,16 +195,18 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
             style={{
               width: '100%',
               height: '100%',
-              backgroundColor: node.style.backgroundColor || 'transparent',
-              border: node.style.borderWidth
-                ? `${node.style.borderWidth}px solid ${node.style.borderColor || '#000000'}`
+              backgroundColor: eff.backgroundColor || 'transparent',
+              border: eff.borderWidth
+                ? `${eff.borderWidth}px solid ${eff.borderColor || '#000000'}`
                 : undefined,
-              borderRadius: node.style.borderRadius ? `${node.style.borderRadius}px` : undefined,
-              padding: node.style.padding ? `${node.style.padding}px` : undefined,
+              borderRadius: eff.borderRadius ? `${eff.borderRadius}px` : undefined,
+              padding: eff.padding ? `${eff.padding}px` : undefined,
               position: 'relative',
             }}
           >
-            {node.children?.map((child: ComponentNode) => renderNode(child, true))}
+            {styledNode.children?.map((child: ComponentNode) =>
+              renderNode(child, bp, desktopWidth, true),
+            )}
           </div>
         </Wrapper>
       )
@@ -190,17 +214,14 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
       return (
         <Wrapper key={node.id} {...wrapperProps}>
           <DividerComponent
-            backgroundColor={node.style.backgroundColor}
-            borderStyle={node.style.borderStyle}
-            borderColor={node.style.borderColor}
-            borderWidth={node.style.borderWidth}
+            backgroundColor={eff.backgroundColor}
+            borderStyle={eff.borderStyle}
+            borderColor={eff.borderColor}
+            borderWidth={eff.borderWidth}
           />
         </Wrapper>
       )
     case 'Input': {
-      // Use the user-set label as the form field name so submissions are
-      // self-describing. The server applies the same regex so anything the
-      // client lets through is safe to store.
       const label = (node.props.label as string) || ''
       const explicitName = (node.props.name as string) || ''
       const fieldName = sanitizeFieldName(explicitName || label || 'field')
@@ -209,11 +230,11 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
           <InputComponent
             {...node.props}
             name={fieldName}
-            color={node.style.color}
-            fontSize={node.style.fontSize}
-            backgroundColor={node.style.backgroundColor}
-            borderColor={node.style.borderColor}
-            borderRadius={node.style.borderRadius}
+            color={eff.color}
+            fontSize={eff.fontSize}
+            backgroundColor={eff.backgroundColor}
+            borderColor={eff.borderColor}
+            borderRadius={eff.borderRadius}
           />
         </Wrapper>
       )
@@ -223,7 +244,7 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
         <Wrapper key={node.id} {...wrapperProps}>
           <MapComponent
             {...node.props}
-            borderRadius={node.style.borderRadius}
+            borderRadius={eff.borderRadius}
           />
         </Wrapper>
       )
@@ -234,9 +255,37 @@ function renderNode(node: ComponentNode, isNested: boolean = false): React.React
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 
-export function RuntimeRenderer({ schema, pageId }: RuntimeRendererProps) {
+export function RuntimeRenderer({
+  schema,
+  pageId,
+  forceBreakpoint,
+}: RuntimeRendererProps) {
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+
+  // Pick a breakpoint either explicitly (preview mode) or from the live
+  // viewport width. Resize listener kept active in both modes so authors
+  // can still see fluid behavior of the *other* breakpoints if they
+  // resize the window.
+  const [bp, setBp] = useState<Breakpoint>(forceBreakpoint ?? 'desktop')
+  useEffect(() => {
+    if (forceBreakpoint) {
+      setBp(forceBreakpoint)
+      return
+    }
+    const compute = () => setBp(detectBreakpoint(window.innerWidth))
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [forceBreakpoint])
+
+  // Canvas width follows the breakpoint so a "Mobile" preview literally
+  // shows a 375px-wide canvas, not desktop-styled content squeezed into
+  // the viewport. Height scales by the SAME factor so a tall desktop
+  // page doesn't end up with a half-empty mobile canvas.
+  const canvasWidth = BREAKPOINT_CANVAS_WIDTH[bp] ?? schema.canvas.width
+  const widthFactor = canvasWidth / schema.canvas.width
+  const canvasHeight = Math.round(schema.canvas.height * widthFactor)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -310,14 +359,16 @@ export function RuntimeRenderer({ schema, pageId }: RuntimeRendererProps) {
         onSubmit={handleSubmit}
         className="bg-white shadow-lg relative"
         style={{
-          width: schema.canvas.width,
-          height: schema.canvas.height,
+          width: canvasWidth,
+          height: canvasHeight,
           backgroundColor: schema.canvas.background || '#ffffff',
           opacity: status === 'submitting' ? 0.7 : 1,
           pointerEvents: status === 'submitting' ? 'none' : 'auto',
         }}
       >
-        {schema.nodes.map((node) => renderNode(node, false))}
+        {schema.nodes.map((node) =>
+          renderNode(node, bp, schema.canvas.width, false),
+        )}
       </form>
     </div>
   )
