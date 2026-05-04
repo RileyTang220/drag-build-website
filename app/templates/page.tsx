@@ -7,6 +7,7 @@ import { useSession, signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { getDefaultCanvasSize } from '@/lib/editorLayout'
 import type { TemplateMeta } from '@/lib/templates/types'
+import { readSseEvents } from '@/lib/sse'
 
 const CATEGORY_LABEL: Record<TemplateMeta['category'], string> = {
   blank: 'Blank',
@@ -16,12 +17,44 @@ const CATEGORY_LABEL: Record<TemplateMeta['category'], string> = {
   landing: 'Landing',
 }
 
+const AI_PROMPT_EXAMPLES = [
+  'A coffee shop landing page with hero image, today\'s menu, opening hours, and a contact form.',
+  'A photographer portfolio with 6 image grid, an "About" section, and a quote-request form.',
+  'A SaaS landing page for a focus-timer app — hero, three feature cards, pricing, and FAQ.',
+] as const
+
+const AI_MIN_LEN = 10
+const AI_MAX_LEN = 1000
+/** Empirically a typical full schema is 3,000–6,000 chars. Drives the
+ *  progress bar; capped at 95% until the `done` event fires. */
+const AI_PROGRESS_TARGET_CHARS = 5000
+
+type Phase = 'connecting' | 'generating' | 'validating' | 'saving' | 'done'
+
+const PHASE_LABEL: Record<Phase, string> = {
+  connecting: 'Connecting to model…',
+  generating: 'Generating layout…',
+  validating: 'Validating schema…',
+  saving: 'Creating your page…',
+  done: 'Done',
+}
+
+type StreamEvent =
+  | { type: 'phase'; phase: Phase }
+  | { type: 'progress'; chars: number }
+  | { type: 'done'; pageId: string; title: string }
+  | { type: 'error'; message: string }
+
 export default function TemplatesPage() {
   const router = useRouter()
   const { status } = useSession()
   const [templates, setTemplates] = useState<TemplateMeta[]>([])
   const [creatingId, setCreatingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiPhase, setAiPhase] = useState<Phase | null>(null)
+  const [aiChars, setAiChars] = useState(0)
 
   useEffect(() => {
     fetch('/api/templates')
@@ -29,6 +62,61 @@ export default function TemplatesPage() {
       .then((d) => setTemplates(d.templates ?? []))
       .catch(() => setError('Failed to load templates'))
   }, [])
+
+  const generateWithAi = async () => {
+    if (status === 'unauthenticated') {
+      signIn('google')
+      return
+    }
+    const prompt = aiPrompt.trim()
+    if (prompt.length < AI_MIN_LEN) {
+      setError(`Add at least ${AI_MIN_LEN} characters describing the site.`)
+      return
+    }
+    setAiBusy(true)
+    setAiPhase('connecting')
+    setAiChars(0)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+
+      // Pre-flight (auth, rate limit, missing API key) returns plain JSON
+      // with the apiError shape — peel it off and surface the message.
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error?.message || `HTTP ${res.status}`)
+      }
+
+      // Success: server is now streaming SSE events. Walk them.
+      let pageId: string | null = null
+      for await (const event of readSseEvents<StreamEvent>(res)) {
+        if (event.type === 'phase') {
+          setAiPhase(event.phase)
+        } else if (event.type === 'progress') {
+          setAiChars(event.chars)
+        } else if (event.type === 'done') {
+          pageId = event.pageId
+          setAiPhase('done')
+        } else if (event.type === 'error') {
+          throw new Error(event.message)
+        }
+      }
+      if (pageId) {
+        router.push(`/editor/${pageId}`)
+      } else {
+        throw new Error('Stream ended without a page id')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'AI generation failed')
+      setAiBusy(false)
+      setAiPhase(null)
+    }
+  }
 
   const create = async (templateId: string | null) => {
     if (status === 'unauthenticated') {
@@ -82,8 +170,66 @@ export default function TemplatesPage() {
 
       {/* ── Content ── */}
       <main className="max-w-6xl mx-auto px-6 py-10">
+        {/* ── AI generator ── */}
+        <section className="mb-10 bg-gradient-to-br from-[#0f172a] to-[#1e3a8a] rounded-2xl p-8 text-white shadow-lg">
+          <div className="flex items-start justify-between gap-6 mb-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/15 text-xs font-medium mb-2">
+                <span>✨</span> AI generator
+              </div>
+              <h2 className="text-2xl font-semibold mb-1">Describe your site, get a draft in seconds</h2>
+              <p className="text-blue-100 text-sm">
+                Tell the model what kind of page you want. It builds the layout — you fine-tune in the editor.
+              </p>
+            </div>
+          </div>
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value.slice(0, AI_MAX_LEN))}
+            disabled={aiBusy}
+            rows={3}
+            placeholder="e.g. A coffee shop landing page with hero image, today's menu, opening hours, and a contact form."
+            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 placeholder-blue-200/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/40 disabled:opacity-60"
+          />
+          <div className="flex items-center justify-between mt-3 text-xs text-blue-100">
+            <span>{aiPrompt.length} / {AI_MAX_LEN}</span>
+            <button
+              onClick={generateWithAi}
+              disabled={aiBusy || aiPrompt.trim().length < AI_MIN_LEN}
+              className="h-9 px-5 bg-white text-[#0f172a] rounded-md text-sm font-medium hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {aiBusy ? (
+                <>
+                  <span className="w-3 h-3 border-2 border-[#0f172a] border-t-transparent rounded-full animate-spin" />
+                  {aiPhase ? PHASE_LABEL[aiPhase] : 'Generating…'}
+                </>
+              ) : (
+                <>Generate</>
+              )}
+            </button>
+          </div>
+
+          {/* Streaming progress — only visible while a generation is in flight. */}
+          {aiBusy && (
+            <AiProgressBar phase={aiPhase} chars={aiChars} />
+          )}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {AI_PROMPT_EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                onClick={() => setAiPrompt(ex)}
+                disabled={aiBusy}
+                className="text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-blue-100 truncate max-w-xs transition-colors disabled:opacity-60"
+                title={ex}
+              >
+                {ex.length > 60 ? ex.slice(0, 57) + '…' : ex}
+              </button>
+            ))}
+          </div>
+        </section>
+
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Start with a template</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Or start with a template</h1>
           <p className="text-gray-500">
             Pick a polished starting point — every element is fully editable.
           </p>
@@ -155,6 +301,43 @@ export default function TemplatesPage() {
           ))}
         </div>
       </main>
+    </div>
+  )
+}
+
+// ─── Streaming progress UI ────────────────────────────────────────────────────
+
+interface AiProgressBarProps {
+  phase: Phase | null
+  chars: number
+}
+
+function AiProgressBar({ phase, chars }: AiProgressBarProps) {
+  // Linear estimate during the (long) `generating` phase, then jump to a
+  // fixed near-finish percentage once the stream moves past it. Capped at
+  // 95% until `done` so the UI never falsely claims completion.
+  let pct = 5
+  if (phase === 'connecting') pct = 5
+  else if (phase === 'generating') {
+    pct = Math.min(85, 10 + (chars / AI_PROGRESS_TARGET_CHARS) * 75)
+  } else if (phase === 'validating') pct = 90
+  else if (phase === 'saving') pct = 95
+  else if (phase === 'done') pct = 100
+
+  return (
+    <div className="mt-4 space-y-2">
+      <div className="flex items-center justify-between text-xs text-blue-100">
+        <span>{phase ? PHASE_LABEL[phase] : ''}</span>
+        {phase === 'generating' && (
+          <span className="tabular-nums opacity-80">{chars.toLocaleString()} chars</span>
+        )}
+      </div>
+      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-white/80 rounded-full transition-all duration-200 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   )
 }

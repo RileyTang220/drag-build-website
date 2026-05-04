@@ -102,6 +102,32 @@ A visual drag-and-drop website builder, built with Next.js, TypeScript, and Post
 - Editor and Runtime are wrapped in React error boundaries; route-level
   `error.tsx` and `global-error.tsx` catch server errors
 
+## AI page generation
+
+The `/templates` page exposes an AI generator powered by DeepSeek's
+OpenAI-compatible Chat Completions API with function calling. The user
+types a brief, and the model is forced to call our `create_page`
+function whose JSON-Schema parameters mirror a subset of `pageSchemaZ`.
+The resulting arguments go through the **same Zod validator** the editor
+uses, so any drift between model output and the runtime renderer is
+caught before a Page row is written.
+
+- Vendor: DeepSeek via the `openai` SDK with `baseURL: https://api.deepseek.com/v1`
+- Model: `deepseek-chat` (V3 — fast and cheap)
+- Hard caps: prompt 10–1000 chars, max 50 nodes, single Page per call
+- Per-user rate limit: 10 generations / hour (in-memory; replace with
+  Redis in production)
+- Auth required — anonymous traffic is rejected at the route boundary
+- Requires `DEEPSEEK_API_KEY` env var; without it the route returns
+  500 and the rest of the app keeps working
+- Streaming: `stream: true` + SSE response to the browser; client
+  consumes via `lib/sse.ts` (POST + ReadableStream parser since
+  `EventSource` is GET-only)
+
+System prompt embeds component conventions (Heading levels, Image must
+be `placehold.co`, Button action types, color discipline) so the model
+returns layouts that fit our schema's grammar.
+
 ## Responsive breakpoints
 
 Each `ComponentNode` has a base `style` (= desktop) plus optional
